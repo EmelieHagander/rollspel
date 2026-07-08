@@ -3,13 +3,15 @@
 <style>
 /* ============================================================================
    The Candlelit Codex — a table-side companion for AI-GM'd D&D one-shots.
-   Mock UI. Data mirrors the rpg.* schema (characters, skills, items,
-   spell_slots [standard|pact], spells). Modifiers, saves, passive perception
-   and spell DC are DERIVED in JS exactly as the migration derives them in SQL.
+   The character sheet reads & writes LIVE against Supabase (schema rpg) when a
+   backend is reachable and you're signed in; otherwise it falls back to a
+   built-in demo party so the page always works. Story / Encounters / Notes have
+   no tables yet, so they stay local (clearly labelled).
+   Modifiers, saves, passive perception and spell DC are DERIVED in JS exactly
+   as the SQL migration derives them — nothing invented is shown as stored.
    ============================================================================ */
 
 :root {
-  /* --- ground & ink: obsidian with a violet bias (dark is the home theme) --- */
   --bg:        #14121b;
   --bg-2:      #1c1926;
   --panel:     #211d2c;
@@ -19,48 +21,26 @@
   --ink:       #ece7f5;
   --ink-dim:   #b3aac6;
   --ink-faint: #7d738f;
-
-  /* --- the two flames --- */
-  --gold:      #d9a441;   /* gilded ember — the accent, spent sparingly */
+  --gold:      #d9a441;
   --gold-soft: #f0cd82;
-  --violet:    #8b7bd8;   /* arcane secondary */
+  --violet:    #8b7bd8;
   --violet-dim:#5b4f86;
-
-  /* --- vitae: semantic, separate from the accent --- */
   --blood:     #c8524e;
   --moss:      #6fae7c;
   --temp:      #5aa6c8;
   --shroud:    #b06fc2;
-
   --shadow: 0 18px 44px -22px rgba(0,0,0,.85), 0 2px 8px -4px rgba(0,0,0,.6);
   --glow:   0 0 22px -4px rgba(217,164,65,.5);
-
   --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
   --sans:  ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --mono:  ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
 }
-
 @media (prefers-color-scheme: light) {
   :root {
-    --bg:        #efe7d6;
-    --bg-2:      #e7ddc8;
-    --panel:     #f6f0e2;
-    --panel-2:   #efe6d4;
-    --line:      #d3c6a9;
-    --line-soft: #ddd1b8;
-    --ink:       #2c2436;
-    --ink-dim:   #574c63;
-    --ink-faint: #8b7f74;
-    --gold:      #a6741a;
-    --gold-soft: #c99a3c;
-    --violet:    #6a54b8;
-    --violet-dim:#a99bd6;
-    --blood:     #a33a37;
-    --moss:      #4d8a5b;
-    --temp:      #2f7f9e;
-    --shroud:    #8a4a9c;
-    --shadow: 0 16px 40px -24px rgba(76,54,20,.55), 0 2px 6px -4px rgba(76,54,20,.3);
-    --glow:   0 0 20px -6px rgba(166,116,26,.45);
+    --bg:#efe7d6;--bg-2:#e7ddc8;--panel:#f6f0e2;--panel-2:#efe6d4;--line:#d3c6a9;--line-soft:#ddd1b8;
+    --ink:#2c2436;--ink-dim:#574c63;--ink-faint:#8b7f74;--gold:#a6741a;--gold-soft:#c99a3c;--violet:#6a54b8;
+    --violet-dim:#a99bd6;--blood:#a33a37;--moss:#4d8a5b;--temp:#2f7f9e;--shroud:#8a4a9c;
+    --shadow:0 16px 40px -24px rgba(76,54,20,.55),0 2px 6px -4px rgba(76,54,20,.3);--glow:0 0 20px -6px rgba(166,116,26,.45);
   }
 }
 :root[data-theme="dark"]  { color-scheme: dark;  --bg:#14121b;--bg-2:#1c1926;--panel:#211d2c;--panel-2:#272232;--line:#362f45;--line-soft:#2b2636;--ink:#ece7f5;--ink-dim:#b3aac6;--ink-faint:#7d738f;--gold:#d9a441;--gold-soft:#f0cd82;--violet:#8b7bd8;--violet-dim:#5b4f86;--blood:#c8524e;--moss:#6fae7c;--temp:#5aa6c8;--shroud:#b06fc2;--shadow:0 18px 44px -22px rgba(0,0,0,.85),0 2px 8px -4px rgba(0,0,0,.6);--glow:0 0 22px -4px rgba(217,164,65,.5); }
@@ -69,14 +49,10 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; }
 body {
-  background: var(--bg);
-  color: var(--ink);
-  font-family: var(--sans);
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-  min-height: 100vh;
+  background: var(--bg); color: var(--ink); font-family: var(--sans); line-height: 1.5;
+  -webkit-font-smoothing: antialiased; min-height: 100vh;
 }
-body::before { /* candle-smoke atmosphere */
+body::before {
   content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
   background:
     radial-gradient(900px 600px at 82% -8%, rgba(217,164,65,.10), transparent 60%),
@@ -85,137 +61,69 @@ body::before { /* candle-smoke atmosphere */
 h1,h2,h3,h4 { font-family: var(--serif); font-weight: 600; text-wrap: balance; margin: 0; }
 button { font-family: inherit; cursor: pointer; }
 .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
-.eyebrow {
-  font-family: var(--mono); font-size: .68rem; letter-spacing: .24em;
-  text-transform: uppercase; color: var(--ink-faint);
-}
+.eyebrow { font-family: var(--mono); font-size: .68rem; letter-spacing: .24em; text-transform: uppercase; color: var(--ink-faint); }
 :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 4px; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 
 /* ===================== LOGIN ===================== */
-#login {
-  position: relative; z-index: 1; min-height: 100vh;
-  display: grid; place-items: center; padding: 24px;
-}
+#login { position: relative; z-index: 1; min-height: 100vh; display: grid; place-items: center; padding: 24px; }
 .gate {
-  width: min(440px, 100%);
-  background: linear-gradient(180deg, var(--panel), var(--panel-2));
-  border: 1px solid var(--line);
-  border-radius: 18px; padding: 40px 36px 34px;
+  width: min(440px, 100%); background: linear-gradient(180deg, var(--panel), var(--panel-2));
+  border: 1px solid var(--line); border-radius: 18px; padding: 40px 36px 30px;
   box-shadow: var(--shadow); position: relative; overflow: hidden;
 }
-.gate::before {
-  content: ""; position: absolute; inset: 0 0 auto 0; height: 2px;
-  background: linear-gradient(90deg, transparent, var(--gold), transparent);
-}
-.sigil {
-  width: 62px; height: 62px; margin: 0 auto 18px; display: block;
-  filter: drop-shadow(var(--glow));
-  animation: breathe 5.5s ease-in-out infinite;
-}
+.gate::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 2px; background: linear-gradient(90deg, transparent, var(--gold), transparent); }
+.sigil { width: 62px; height: 62px; margin: 0 auto 18px; display: block; filter: drop-shadow(var(--glow)); animation: breathe 5.5s ease-in-out infinite; }
 @keyframes breathe { 0%,100%{ opacity:.85; transform: scale(1); } 50%{ opacity:1; transform: scale(1.04); } }
 .gate h1 { font-size: 1.9rem; text-align: center; letter-spacing: .01em; }
-.gate .tagline {
-  text-align: center; color: var(--ink-dim); font-family: var(--serif);
-  font-style: italic; font-size: 1.02rem; margin: 8px 0 26px;
-}
+.gate .tagline { text-align: center; color: var(--ink-dim); font-family: var(--serif); font-style: italic; font-size: 1.02rem; margin: 8px 0 26px; }
 .field { margin-bottom: 16px; }
-.field label {
-  display: block; font-family: var(--mono); font-size: .66rem; letter-spacing: .18em;
-  text-transform: uppercase; color: var(--ink-faint); margin-bottom: 7px;
-}
-.field input {
-  width: 100%; padding: 12px 14px; border-radius: 10px;
-  background: var(--bg-2); border: 1px solid var(--line);
-  color: var(--ink); font-family: var(--sans); font-size: .95rem;
-}
+.field label { display: block; font-family: var(--mono); font-size: .66rem; letter-spacing: .18em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 7px; }
+.field input { width: 100%; padding: 12px 14px; border-radius: 10px; background: var(--bg-2); border: 1px solid var(--line); color: var(--ink); font-family: var(--sans); font-size: .95rem; }
 .field input::placeholder { color: var(--ink-faint); }
-.btn {
-  border: 1px solid var(--line); background: var(--panel-2); color: var(--ink);
-  padding: 10px 16px; border-radius: 10px; font-size: .9rem; font-weight: 600;
-  transition: transform .12s ease, border-color .2s, background .2s;
-}
+.btn { border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); padding: 10px 16px; border-radius: 10px; font-size: .9rem; font-weight: 600; transition: transform .12s ease, border-color .2s, background .2s; }
 .btn:hover { transform: translateY(-1px); border-color: var(--violet-dim); }
 .btn:active { transform: translateY(0); }
-.btn-gold {
-  width: 100%; margin-top: 6px; padding: 13px; font-size: .98rem;
-  background: linear-gradient(180deg, var(--gold), #b8862d);
-  color: #1a1206; border: none; letter-spacing: .02em; box-shadow: var(--glow);
-}
-:root[data-theme="light"] .btn-gold, @media (prefers-color-scheme: light){ .btn-gold{ color:#fff; } }
-.gate .fine {
-  margin-top: 20px; text-align: center; font-size: .78rem; color: var(--ink-faint);
-}
-.gate .fine b { color: var(--violet); font-weight: 600; }
+.btn[disabled] { opacity: .55; cursor: progress; transform: none; }
+.btn-gold { width: 100%; margin-top: 6px; padding: 13px; font-size: .98rem; background: linear-gradient(180deg, var(--gold), #b8862d); color: #1a1206; border: none; letter-spacing: .02em; box-shadow: var(--glow); }
+:root[data-theme="light"] .btn-gold { color:#fff; }
+.gate .fine { margin-top: 16px; text-align: center; font-size: .8rem; color: var(--ink-faint); }
+.gate .link { color: var(--violet); cursor: pointer; font-weight: 600; }
+.gate .link:hover { color: var(--gold); text-decoration: underline; }
+.autherr { min-height: 0; margin: 0 0 12px; font-size: .8rem; font-family: var(--mono); color: var(--blood); }
+.autherr.info { color: var(--violet); }
+.autherr:empty { margin: 0; }
+.pill { font-family: var(--mono); font-size: .58rem; letter-spacing: .12em; text-transform: uppercase; padding: 2px 9px; border-radius: 20px; border: 1px solid var(--line); }
+.pill.live { color: var(--moss); border-color: color-mix(in srgb, var(--moss) 45%, var(--line)); }
+.pill.demo { color: var(--ink-faint); }
 
 /* ===================== APP SHELL ===================== */
 #app { display: none; position: relative; z-index: 1; }
 #app.on { display: grid; grid-template-columns: 76px 1fr; min-height: 100vh; }
-
-.rail {
-  position: sticky; top: 0; height: 100vh;
-  display: flex; flex-direction: column; align-items: center; gap: 6px;
-  padding: 16px 0; background: var(--bg-2); border-right: 1px solid var(--line-soft);
-}
+.rail { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 16px 0; background: var(--bg-2); border-right: 1px solid var(--line-soft); }
 .rail .rail-sigil { width: 34px; height: 34px; margin-bottom: 12px; filter: drop-shadow(var(--glow)); }
-.navbtn {
-  width: 52px; height: 52px; border-radius: 13px; border: 1px solid transparent;
-  background: transparent; color: var(--ink-faint);
-  display: grid; place-items: center; position: relative;
-  transition: color .18s, background .18s, border-color .18s;
-}
+.navbtn { width: 52px; height: 52px; border-radius: 13px; border: 1px solid transparent; background: transparent; color: var(--ink-faint); display: grid; place-items: center; position: relative; transition: color .18s, background .18s, border-color .18s; }
 .navbtn svg { width: 22px; height: 22px; }
 .navbtn:hover { color: var(--ink); background: var(--panel); }
 .navbtn.active { color: var(--gold); background: var(--panel); border-color: var(--line); }
-.navbtn.active::before {
-  content: ""; position: absolute; left: -16px; top: 12px; bottom: 12px; width: 3px;
-  border-radius: 3px; background: var(--gold); box-shadow: var(--glow);
-}
-.navbtn .tip {
-  position: absolute; left: 60px; white-space: nowrap; background: var(--panel);
-  border: 1px solid var(--line); color: var(--ink); padding: 5px 10px; border-radius: 8px;
-  font-size: .78rem; opacity: 0; pointer-events: none; transform: translateX(-4px);
-  transition: opacity .15s, transform .15s; box-shadow: var(--shadow); z-index: 5;
-}
+.navbtn.active::before { content: ""; position: absolute; left: -16px; top: 12px; bottom: 12px; width: 3px; border-radius: 3px; background: var(--gold); box-shadow: var(--glow); }
+.navbtn .tip { position: absolute; left: 60px; white-space: nowrap; background: var(--panel); border: 1px solid var(--line); color: var(--ink); padding: 5px 10px; border-radius: 8px; font-size: .78rem; opacity: 0; pointer-events: none; transform: translateX(-4px); transition: opacity .15s, transform .15s; box-shadow: var(--shadow); z-index: 5; }
 .navbtn:hover .tip { opacity: 1; transform: translateX(0); }
 .rail .spacer { flex: 1; }
 
 .main { min-width: 0; }
-.topbar {
-  position: sticky; top: 0; z-index: 4;
-  display: flex; align-items: center; gap: 16px;
-  padding: 14px 26px; background: color-mix(in srgb, var(--bg) 82%, transparent);
-  backdrop-filter: blur(10px); border-bottom: 1px solid var(--line-soft);
-}
+.topbar { position: sticky; top: 0; z-index: 4; display: flex; align-items: center; gap: 16px; padding: 14px 26px; background: color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line-soft); }
 .who { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.crest {
-  width: 44px; height: 44px; border-radius: 12px; flex: none;
-  display: grid; place-items: center; font-family: var(--serif); font-size: 1.35rem; font-weight: 700;
-  color: #1a1206; background: radial-gradient(circle at 30% 25%, var(--gold-soft), var(--gold));
-  box-shadow: var(--glow);
-}
+.crest { width: 44px; height: 44px; border-radius: 12px; flex: none; display: grid; place-items: center; font-family: var(--serif); font-size: 1.35rem; font-weight: 700; color: #1a1206; background: radial-gradient(circle at 30% 25%, var(--gold-soft), var(--gold)); box-shadow: var(--glow); }
 .who .nm { font-family: var(--serif); font-size: 1.12rem; font-weight: 600; line-height: 1.15; }
 .who .sub { font-size: .78rem; color: var(--ink-dim); }
 .who .sub b { color: var(--violet); font-weight: 600; }
 .topbar .grow { flex: 1; }
-.switcher {
-  display: flex; align-items: center; gap: 6px; background: var(--panel);
-  border: 1px solid var(--line); border-radius: 12px; padding: 4px;
-}
-.switcher button {
-  border: none; background: transparent; color: var(--ink-dim);
-  width: 34px; height: 34px; border-radius: 9px; font-family: var(--serif); font-weight: 700;
-  transition: background .15s, color .15s;
-}
+.topbar .whoami { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-size: .72rem; color: var(--ink-faint); }
+.switcher { display: flex; align-items: center; gap: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 4px; }
+.switcher button { border: none; background: transparent; color: var(--ink-dim); width: 34px; height: 34px; border-radius: 9px; font-family: var(--serif); font-weight: 700; transition: background .15s, color .15s; }
 .switcher button:hover { background: var(--panel-2); color: var(--ink); }
 .switcher button.on { background: var(--violet-dim); color: #fff; }
-.iconbtn {
-  width: 40px; height: 40px; border-radius: 11px; border: 1px solid var(--line);
-  background: var(--panel); color: var(--ink-dim); display: grid; place-items: center;
-  transition: color .15s, border-color .15s;
-}
-.iconbtn:hover { color: var(--gold); border-color: var(--violet-dim); }
-.iconbtn svg { width: 18px; height: 18px; }
 
 .view { display: none; padding: 26px 26px 120px; max-width: 1180px; }
 .view.on { display: block; animation: fade .35s ease; }
@@ -223,45 +131,27 @@ button { font-family: inherit; cursor: pointer; }
 .view-head { margin-bottom: 18px; }
 .view-head h2 { font-size: 1.7rem; letter-spacing: .01em; }
 .view-head p { color: var(--ink-dim); margin: 4px 0 0; font-family: var(--serif); font-style: italic; }
+.local-note { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; font-family: var(--mono); font-size: .6rem; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); border: 1px dashed var(--line); border-radius: 20px; padding: 3px 10px; }
 
-/* --- cards --- */
-.card {
-  background: linear-gradient(180deg, var(--panel), var(--panel-2));
-  border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px;
-  box-shadow: var(--shadow);
-}
-.card > .card-t {
-  display: flex; align-items: center; gap: 8px; margin: -2px 0 14px;
-  font-family: var(--mono); font-size: .68rem; letter-spacing: .2em;
-  text-transform: uppercase; color: var(--gold);
-}
+.card { background: linear-gradient(180deg, var(--panel), var(--panel-2)); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; box-shadow: var(--shadow); }
+.card > .card-t { display: flex; align-items: center; gap: 8px; margin: -2px 0 14px; font-family: var(--mono); font-size: .68rem; letter-spacing: .2em; text-transform: uppercase; color: var(--gold); }
 .card > .card-t .rule { flex: 1; height: 1px; background: linear-gradient(90deg, var(--line), transparent); }
 
 .grid { display: grid; gap: 16px; }
 .sheet { grid-template-columns: 300px 1fr; align-items: start; }
 @media (max-width: 900px) { #app.on { grid-template-columns: 60px 1fr; } .sheet { grid-template-columns: 1fr; } }
 
-/* --- vitals (HP) --- */
 .vitals .hpwrap { display: flex; align-items: baseline; gap: 8px; }
 .hp-big { font-family: var(--serif); font-size: 2.9rem; font-weight: 700; line-height: 1; }
 .hp-max { color: var(--ink-faint); font-family: var(--mono); font-size: 1rem; }
-.hp-temp-badge {
-  margin-left: auto; font-family: var(--mono); font-size: .72rem; color: var(--temp);
-  border: 1px solid color-mix(in srgb, var(--temp) 45%, var(--line)); border-radius: 20px;
-  padding: 3px 9px;
-}
+.hp-temp-badge { margin-left: auto; font-family: var(--mono); font-size: .72rem; color: var(--temp); border: 1px solid color-mix(in srgb, var(--temp) 45%, var(--line)); border-radius: 20px; padding: 3px 9px; }
 .hpbar { height: 12px; border-radius: 8px; background: var(--bg-2); overflow: hidden; margin: 12px 0 4px; position: relative; border: 1px solid var(--line-soft); }
 .hpbar i { display: block; height: 100%; background: linear-gradient(90deg, var(--blood), #e0776f); transition: width .4s cubic-bezier(.2,.8,.2,1); }
 .hpbar .tempseg { position: absolute; top:0; right:0; height:100%; background: repeating-linear-gradient(45deg, var(--temp), var(--temp) 4px, transparent 4px, transparent 8px); opacity:.55; }
 .hp-ctrls { display: flex; gap: 6px; margin-top: 12px; }
-.hp-ctrls input {
-  width: 56px; text-align: center; background: var(--bg-2); border: 1px solid var(--line);
-  color: var(--ink); border-radius: 9px; padding: 8px 4px; font-family: var(--mono);
-}
+.hp-ctrls input { width: 56px; text-align: center; background: var(--bg-2); border: 1px solid var(--line); color: var(--ink); border-radius: 9px; padding: 8px 4px; font-family: var(--mono); }
 .hp-ctrls .btn { flex: 1; padding: 8px; }
 .dmg { color: var(--blood); } .heal { color: var(--moss); }
-
-/* death saves */
 .deaths { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line-soft); }
 .pip-row { display: flex; gap: 5px; }
 .pip { width: 17px; height: 17px; border-radius: 50%; border: 1.5px solid var(--line); cursor: pointer; transition: transform .12s, background .15s, border-color .15s; }
@@ -270,27 +160,21 @@ button { font-family: inherit; cursor: pointer; }
 .pip.fail.on { background: var(--blood); border-color: var(--blood); }
 .deaths .lab { font-family: var(--mono); font-size: .64rem; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint); }
 
-/* stat chips row */
 .statline { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .stat { background: var(--bg-2); border: 1px solid var(--line-soft); border-radius: 12px; padding: 10px; text-align: center; }
 .stat .k { font-family: var(--mono); font-size: .6rem; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); }
 .stat .v { font-family: var(--serif); font-size: 1.5rem; font-weight: 700; }
 .stat .v small { font-size: .8rem; color: var(--ink-dim); font-family: var(--mono); }
 
-/* ability hexes */
 .abilities { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
 @media (max-width: 620px){ .abilities { grid-template-columns: repeat(3,1fr);} }
-.abil {
-  position: relative; text-align: center; padding: 12px 6px 10px; border-radius: 14px;
-  background: var(--bg-2); border: 1px solid var(--line-soft);
-}
+.abil { position: relative; text-align: center; padding: 12px 6px 10px; border-radius: 14px; background: var(--bg-2); border: 1px solid var(--line-soft); }
 .abil .k { font-family: var(--mono); font-size: .6rem; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-faint); }
 .abil .mod { font-family: var(--serif); font-size: 1.85rem; font-weight: 700; line-height: 1.1; }
 .abil .score { font-family: var(--mono); font-size: .74rem; color: var(--ink-dim); }
 .abil.save { border-color: color-mix(in srgb, var(--gold) 40%, var(--line)); }
 .abil.save::after { content: "save"; position: absolute; top: 6px; right: 8px; font-family: var(--mono); font-size: .5rem; letter-spacing: .1em; text-transform: uppercase; color: var(--gold); }
 
-/* skills */
 .skills { columns: 2; column-gap: 26px; }
 @media (max-width: 560px){ .skills { columns: 1; } }
 .skill { display: flex; align-items: center; gap: 9px; padding: 6px 0; break-inside: avoid; border-bottom: 1px dashed var(--line-soft); }
@@ -301,7 +185,6 @@ button { font-family: inherit; cursor: pointer; }
 .skill .ab { font-family: var(--mono); font-size: .6rem; color: var(--ink-faint); text-transform: uppercase; }
 .skill .bonus { font-family: var(--mono); font-weight: 600; color: var(--gold-soft); min-width: 30px; text-align: right; }
 
-/* spell slots */
 .slotrow { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line-soft); }
 .slotrow:last-child { border: none; }
 .slotrow .lvl { font-family: var(--serif); font-weight: 700; width: 74px; font-size: .9rem; }
@@ -313,15 +196,10 @@ button { font-family: inherit; cursor: pointer; }
 .slot.pact.full { background: radial-gradient(circle at 35% 30%, var(--gold-soft), var(--gold)); border-color: var(--gold); box-shadow: 0 0 10px -2px var(--gold); }
 .slot.pact { border-color: color-mix(in srgb, var(--gold) 55%, var(--line)); }
 
-/* spell/inventory lists */
 .list { display: flex; flex-direction: column; }
 .li { display: flex; align-items: center; gap: 10px; padding: 9px 2px; border-bottom: 1px solid var(--line-soft); }
 .li:last-child { border: none; }
-.li .badge {
-  font-family: var(--mono); font-size: .6rem; width: 26px; height: 26px; flex: none;
-  display: grid; place-items: center; border-radius: 8px; background: var(--bg-2);
-  border: 1px solid var(--line); color: var(--ink-dim);
-}
+.li .badge { font-family: var(--mono); font-size: .6rem; width: 26px; height: 26px; flex: none; display: grid; place-items: center; border-radius: 8px; background: var(--bg-2); border: 1px solid var(--line); color: var(--ink-dim); }
 .li .badge.cantrip { color: var(--violet); border-color: var(--violet-dim); }
 .li .nm { flex: 1; font-size: .9rem; }
 .li .nm small { display: block; color: var(--ink-faint); font-size: .74rem; font-family: var(--serif); font-style: italic; }
@@ -330,14 +208,12 @@ button { font-family: inherit; cursor: pointer; }
 .tag.att { color: var(--shroud); border-color: color-mix(in srgb, var(--shroud) 45%, var(--line)); }
 .qty { font-family: var(--mono); color: var(--ink-faint); font-size: .8rem; }
 
-/* coins */
 .coins { display: flex; gap: 8px; flex-wrap: wrap; }
 .coin { display: flex; align-items: center; gap: 7px; background: var(--bg-2); border: 1px solid var(--line-soft); border-radius: 20px; padding: 5px 11px 5px 6px; }
 .coin .disc { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-family: var(--mono); font-size: .56rem; font-weight: 700; color: #201607; }
 .coin .amt { font-family: var(--mono); font-weight: 600; font-size: .85rem; }
 .coin .cn { font-family: var(--mono); font-size: .58rem; color: var(--ink-faint); text-transform: uppercase; }
 
-/* ===================== STORY ===================== */
 .scene { position: relative; padding: 0 0 4px 30px; }
 .scene::before { content: ""; position: absolute; left: 8px; top: 4px; bottom: 0; width: 2px; background: linear-gradient(var(--violet-dim), transparent); }
 .scene .node { position: absolute; left: 2px; top: 3px; width: 14px; height: 14px; border-radius: 50%; background: var(--bg); border: 2px solid var(--violet); }
@@ -350,7 +226,6 @@ button { font-family: inherit; cursor: pointer; }
 .chip { font-family: var(--mono); font-size: .56rem; letter-spacing: .1em; text-transform: uppercase; padding: 2px 8px; border-radius: 20px; }
 .chip.now { background: var(--gold); color: #1a1206; }
 .chip.done { border: 1px solid var(--line); color: var(--ink-faint); }
-
 .secret { margin-top: 10px; }
 .secret button { width: 100%; text-align: left; display: flex; align-items: center; gap: 10px; background: var(--bg-2); border: 1px dashed var(--violet-dim); color: var(--violet); border-radius: 11px; padding: 11px 14px; font-family: var(--mono); font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; }
 .secret button:hover { background: var(--panel-2); }
@@ -358,15 +233,10 @@ button { font-family: inherit; cursor: pointer; }
 .secret.open .body { display: block; animation: fade .3s ease; }
 .secret.open button { border-style: solid; border-radius: 11px 11px 0 0; color: var(--gold); border-color: var(--line); }
 
-/* ===================== ENCOUNTERS ===================== */
 .enc-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
 .round { font-family: var(--serif); font-weight: 700; font-size: 1.1rem; }
 .round small { color: var(--ink-faint); font-family: var(--mono); font-size: .66rem; letter-spacing: .12em; text-transform: uppercase; display: block; font-weight: 400; }
-.combatant {
-  display: grid; grid-template-columns: 44px 1fr auto; align-items: center; gap: 14px;
-  padding: 12px 14px; border-radius: 13px; border: 1px solid var(--line-soft); background: var(--bg-2);
-  margin-bottom: 8px; transition: border-color .2s, transform .12s, box-shadow .2s;
-}
+.combatant { display: grid; grid-template-columns: 44px 1fr auto; align-items: center; gap: 14px; padding: 12px 14px; border-radius: 13px; border: 1px solid var(--line-soft); background: var(--bg-2); margin-bottom: 8px; transition: border-color .2s, transform .12s, box-shadow .2s; }
 .combatant.active { border-color: var(--gold); box-shadow: var(--glow); transform: translateX(4px); background: var(--panel); }
 .combatant.foe .init { color: var(--blood); }
 .combatant.downed { opacity: .5; }
@@ -380,13 +250,8 @@ button { font-family: inherit; cursor: pointer; }
 .combatant .hpn button { border: 1px solid var(--line); background: var(--panel); color: var(--ink-dim); width: 24px; height: 24px; border-radius: 7px; font-weight: 700; margin-left: 4px; }
 .combatant .hpn button:hover { color: var(--gold); border-color: var(--violet-dim); }
 
-/* ===================== NOTES ===================== */
 .notes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
-.note {
-  background: linear-gradient(180deg, var(--panel), var(--panel-2)); border: 1px solid var(--line);
-  border-radius: 14px; padding: 14px 16px; position: relative; box-shadow: var(--shadow);
-  border-top: 3px solid var(--violet);
-}
+.note { background: linear-gradient(180deg, var(--panel), var(--panel-2)); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; position: relative; box-shadow: var(--shadow); border-top: 3px solid var(--violet); }
 .note.pin { border-top-color: var(--gold); }
 .note h4 { font-size: 1rem; margin-bottom: 6px; }
 .note p { margin: 0; color: var(--ink-dim); font-size: .88rem; white-space: pre-wrap; }
@@ -394,30 +259,15 @@ button { font-family: inherit; cursor: pointer; }
 .note .del { position: absolute; top: 10px; right: 10px; background: none; border: none; color: var(--ink-faint); font-size: 1rem; opacity: 0; transition: opacity .15s; }
 .note:hover .del { opacity: 1; }
 .note .del:hover { color: var(--blood); }
-.note-new textarea, .note-new input {
-  width: 100%; background: var(--bg-2); border: 1px solid var(--line); color: var(--ink);
-  border-radius: 9px; padding: 9px 11px; font-family: var(--sans); resize: vertical;
-}
+.note-new textarea, .note-new input { width: 100%; background: var(--bg-2); border: 1px solid var(--line); color: var(--ink); border-radius: 9px; padding: 9px 11px; font-family: var(--sans); resize: vertical; }
 .note-new input { margin-bottom: 8px; font-family: var(--serif); font-weight: 600; }
 .note-new { display: flex; flex-direction: column; border-style: dashed; }
 .note-new .row { display: flex; gap: 8px; margin-top: 8px; }
 
-/* ===================== DICE ROLLER ===================== */
-.fab {
-  position: fixed; right: 24px; bottom: 24px; z-index: 20;
-  width: 60px; height: 60px; border-radius: 18px; border: 1px solid var(--line);
-  background: radial-gradient(circle at 30% 25%, var(--panel-2), var(--panel));
-  color: var(--gold); display: grid; place-items: center; box-shadow: var(--shadow);
-  transition: transform .15s, box-shadow .2s;
-}
+.fab { position: fixed; right: 24px; bottom: 24px; z-index: 20; width: 60px; height: 60px; border-radius: 18px; border: 1px solid var(--line); background: radial-gradient(circle at 30% 25%, var(--panel-2), var(--panel)); color: var(--gold); display: grid; place-items: center; box-shadow: var(--shadow); transition: transform .15s, box-shadow .2s; }
 .fab:hover { transform: translateY(-2px) rotate(-8deg); box-shadow: var(--shadow), var(--glow); }
 .fab svg { width: 30px; height: 30px; }
-.tray {
-  position: fixed; right: 24px; bottom: 96px; z-index: 20; width: 300px;
-  background: linear-gradient(180deg, var(--panel), var(--panel-2)); border: 1px solid var(--line);
-  border-radius: 16px; padding: 16px; box-shadow: var(--shadow);
-  display: none; transform-origin: bottom right;
-}
+.tray { position: fixed; right: 24px; bottom: 96px; z-index: 20; width: 300px; background: linear-gradient(180deg, var(--panel), var(--panel-2)); border: 1px solid var(--line); border-radius: 16px; padding: 16px; box-shadow: var(--shadow); display: none; transform-origin: bottom right; }
 .tray.on { display: block; animation: pop .22s cubic-bezier(.2,1.3,.4,1); }
 @keyframes pop { from { opacity: 0; transform: scale(.85) translateY(10px); } to { opacity: 1; transform: none; } }
 .tray .dice-btns { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; margin-bottom: 12px; }
@@ -432,6 +282,12 @@ button { font-family: inherit; cursor: pointer; }
 .roll-label { font-family: var(--mono); font-size: .7rem; color: var(--ink-faint); letter-spacing: .1em; text-transform: uppercase; margin-top: 4px; min-height: 1em; }
 .roll-log { margin-top: 10px; max-height: 90px; overflow-y: auto; font-family: var(--mono); font-size: .72rem; color: var(--ink-faint); border-top: 1px solid var(--line-soft); padding-top: 8px; }
 .roll-log div { padding: 2px 0; }
+
+/* transient save toast */
+.toast { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(20px); z-index: 40; background: var(--panel); border: 1px solid var(--line); color: var(--ink); padding: 9px 16px; border-radius: 11px; box-shadow: var(--shadow); font-size: .82rem; font-family: var(--mono); opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s; display: flex; align-items: center; gap: 8px; }
+.toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast .dotk { width: 8px; height: 8px; border-radius: 50%; background: var(--moss); }
+.toast.err .dotk { background: var(--blood); }
 
 .foot { padding: 22px 26px 30px; color: var(--ink-faint); font-size: .76rem; font-family: var(--mono); border-top: 1px solid var(--line-soft); max-width: 1180px; }
 .foot b { color: var(--violet); font-weight: 600; }
@@ -448,24 +304,25 @@ button { font-family: inherit; cursor: pointer; }
     </svg>
     <h1>The Candlelit Codex</h1>
     <p class="tagline">Your character, kept by the fire between one‑shots.</p>
-    <form id="loginForm" autocomplete="off">
+    <form id="loginForm" autocomplete="on">
       <div class="field">
         <label for="email">Adventurer's mark</label>
-        <input id="email" type="email" placeholder="you@thetable.rpg" value="emelie.hagander@gmail.com" />
+        <input id="email" type="email" placeholder="you@thetable.rpg" value="emelie.hagander@gmail.com" autocomplete="email" />
       </div>
       <div class="field">
         <label for="pw">Passphrase</label>
-        <input id="pw" type="password" placeholder="•••••••••••" value="candleflame" />
+        <input id="pw" type="password" placeholder="at least 6 characters" autocomplete="current-password" />
       </div>
-      <button class="btn btn-gold" type="submit">Enter the room</button>
+      <p class="autherr" id="authErr" role="alert"></p>
+      <button class="btn btn-gold" type="submit" id="authBtn">Enter the room</button>
     </form>
-    <p class="fine">A binder for AI‑run D&amp;D one‑shots. Signed as <b>Emelie</b> · <span style="cursor:pointer" id="demoLink">enter as guest →</span></p>
+    <p class="fine" id="modeLine">New to the table? <span class="link" id="modeToggle">Forge an account →</span></p>
+    <p class="fine"><span class="link" id="demoLink">Peek in as a guest</span> · <span class="pill demo" id="statusPill">checking the wards…</span></p>
   </div>
 </section>
 
 <!-- ============================ APP ============================ -->
 <div id="app">
-  <!-- rune rail -->
   <nav class="rail">
     <svg class="rail-sigil" viewBox="0 0 100 100" fill="none" stroke="var(--gold)" stroke-width="3">
       <circle cx="50" cy="50" r="38"/><path d="M50 16 L78 66 L22 66 Z" stroke="var(--violet)"/>
@@ -499,7 +356,6 @@ button { font-family: inherit; cursor: pointer; }
   </nav>
 
   <div class="main">
-    <!-- topbar -->
     <header class="topbar">
       <div class="who">
         <div class="crest" id="tbCrest">V</div>
@@ -509,6 +365,10 @@ button { font-family: inherit; cursor: pointer; }
         </div>
       </div>
       <div class="grow"></div>
+      <div class="whoami">
+        <span class="pill demo" id="livePill">demo</span>
+        <span id="whoEmail"></span>
+      </div>
       <div class="switcher" id="switcher" title="Switch character"></div>
     </header>
 
@@ -519,9 +379,7 @@ button { font-family: inherit; cursor: pointer; }
         <h2 id="shName">Vesper Quill</h2>
         <p id="shTag">"I made a bargain with something that laughs in the dark. It's been very generous."</p>
       </div>
-
       <div class="grid sheet">
-        <!-- left column: vitals -->
         <div class="grid" style="gap:16px;">
           <div class="card vitals">
             <div class="card-t">Vitals <span class="rule"></span></div>
@@ -537,15 +395,10 @@ button { font-family: inherit; cursor: pointer; }
               <button class="btn heal" id="btnHeal">+ Heal</button>
             </div>
             <div class="deaths">
-              <div><div class="lab">Death saves</div>
-                <div class="pip-row" id="succRow" style="margin-top:5px"></div>
-              </div>
-              <div style="text-align:right"><div class="lab">Failures</div>
-                <div class="pip-row" id="failRow" style="margin-top:5px;justify-content:flex-end"></div>
-              </div>
+              <div><div class="lab">Death saves</div><div class="pip-row" id="succRow" style="margin-top:5px"></div></div>
+              <div style="text-align:right"><div class="lab">Failures</div><div class="pip-row" id="failRow" style="margin-top:5px;justify-content:flex-end"></div></div>
             </div>
           </div>
-
           <div class="card">
             <div class="card-t">Defenses <span class="rule"></span></div>
             <div class="statline">
@@ -559,20 +412,16 @@ button { font-family: inherit; cursor: pointer; }
               <div class="mono" id="hitDice" style="font-size:.9rem;color:var(--ink-dim)">5 / 5 · d8</div>
             </div>
           </div>
-
           <div class="card">
             <div class="card-t">Purse <span class="rule"></span></div>
             <div class="coins" id="coins"></div>
           </div>
         </div>
-
-        <!-- right column -->
         <div class="grid" style="gap:16px;">
           <div class="card">
             <div class="card-t">Abilities <span class="rule"></span></div>
             <div class="abilities" id="abilities"></div>
           </div>
-
           <div class="grid" style="grid-template-columns:1fr 1fr;gap:16px" id="twoCol">
             <div class="card">
               <div class="card-t">Skills <span class="rule"></span></div>
@@ -589,7 +438,6 @@ button { font-family: inherit; cursor: pointer; }
               </div>
             </div>
           </div>
-
           <div class="card">
             <div class="card-t">Satchel <span class="rule"></span></div>
             <div class="list" id="items"></div>
@@ -604,6 +452,7 @@ button { font-family: inherit; cursor: pointer; }
         <span class="eyebrow">adventures/dnd5e/the‑drowned‑bell</span>
         <h2>The Drowned Bell</h2>
         <p>A fishing town rings a bell no living hand pulls. Something under the harbour is counting the hours until it's free.</p>
+        <span class="local-note">◈ sample adventure — no table yet in the schema</span>
       </div>
       <div class="grid" style="grid-template-columns:1.4fr .9fr;gap:16px" id="storyGrid">
         <div class="card">
@@ -630,6 +479,7 @@ button { font-family: inherit; cursor: pointer; }
         <span class="eyebrow">Initiative · the bell tower</span>
         <h2>The Bell‑Ringer's Wake</h2>
         <p>Barnacled dead climb the tower stair. Roll for initiative — the bell tolls in three rounds.</p>
+        <span class="local-note">◈ local tracker — encounters aren't in the schema yet</span>
       </div>
       <div class="card">
         <div class="enc-head">
@@ -648,32 +498,48 @@ button { font-family: inherit; cursor: pointer; }
         <span class="eyebrow">Field notes · yours alone</span>
         <h2>The Margins</h2>
         <p>Scribbles the GM never sees. Suspicions, debts, and things you swore you'd remember.</p>
+        <span class="local-note">◈ kept on this device — a notes table is a good next migration</span>
       </div>
       <div class="notes-grid" id="notes"></div>
     </section>
 
     <footer class="foot">
-      Mock UI · data mirrors the <b>rpg</b> schema in Supabase project yuobtgoidmmmwfqenkau. Modifiers, saves, passive perception and spell DC are derived here exactly as the migration derives them in SQL — nothing invented is shown as stored.
+      <span id="footState">Demo mode</span> · the character sheet mirrors the <b>rpg</b> schema (Supabase project yuobtgoidmmmwfqenkau). Modifiers, saves, passive perception and spell DC are derived here exactly as the migration derives them in SQL — nothing invented is shown as stored.
     </footer>
   </div>
 </div>
 
-<!-- dice roller -->
 <button class="fab" id="fab" aria-label="Roll dice">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2l8.5 5v10L12 22 3.5 17V7z"/><path d="M12 2v20M3.5 7L12 12l8.5-5M12 12l8.5 5M12 12l-8.5 5"/></svg>
 </button>
 <div class="tray" id="tray">
   <div class="card-t" style="color:var(--gold)">Cast the bones <span class="rule"></span></div>
   <div class="dice-btns" id="diceBtns"></div>
-  <div class="roll-out">
-    <div class="roll-die" id="rollDie">—</div>
-    <div class="roll-label" id="rollLabel">pick a die</div>
-  </div>
+  <div class="roll-out"><div class="roll-die" id="rollDie">—</div><div class="roll-label" id="rollLabel">pick a die</div></div>
   <div class="roll-log" id="rollLog"></div>
 </div>
 
+<div class="toast" id="toast"><span class="dotk"></span><span id="toastMsg"></span></div>
+
+<!-- Supabase client. Blocked by the Artifact sandbox's CSP (that's fine — the
+     page detects its absence and runs in demo mode). Loads normally when the
+     file is served from a real origin, where the live login works. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-/* ===================== MOCK DATA (mirrors rpg.* rows) ===================== */
+/* ===================== BACKEND CONFIG ===================== */
+const SUPA_URL = "https://yuobtgoidmmmwfqenkau.supabase.co";
+const SUPA_KEY = "sb_publishable_5mM_XYUA-fj17dFmrErsHA_uznvRXGY";
+const RPG = "rpg";                       // our schema fence
+
+let sb = null, LIVE = false, demoMode = false, authMode = "signin";
+try {
+  if (window.supabase && SUPA_URL && SUPA_KEY) {
+    sb = window.supabase.createClient(SUPA_URL, SUPA_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
+    LIVE = true;
+  }
+} catch (e) { LIVE = false; }
+
+/* ===================== 5e DERIVATION (mirrors the SQL) ===================== */
 const ABILS = ["strength","dexterity","constitution","intelligence","wisdom","charisma"];
 const SKILL_ABIL = {
   acrobatics:"dexterity", animal_handling:"wisdom", arcana:"intelligence", athletics:"strength",
@@ -683,124 +549,135 @@ const SKILL_ABIL = {
   stealth:"dexterity", survival:"wisdom"
 };
 const titleCase = s => s.replace(/_/g," ").replace(/\b\w/g, c => c.toUpperCase());
-const mod = score => Math.floor((score - 10) / 2);      // rpg.ability_modifier
-const profBonus = lvl => 2 + Math.floor((lvl - 1) / 4); // generated column
+const mod = score => Math.floor((score - 10) / 2);
+const profBonus = lvl => 2 + Math.floor((lvl - 1) / 4);
 const sgn = n => (n >= 0 ? "+" : "") + n;
 
-const PARTY = [
-  {
-    id:"vesper", name:"Vesper Quill", player:"Emelie", initial:"V",
-    klass:"Warlock", subclass:"The Archfey", species:"Tiefling", level:5, background:"Charlatan",
-    alignment:"chaotic_good",
+/* ===================== DEMO PARTY (fallback when offline / guest) ===================== */
+const MOCK = [
+  { id:"vesper", name:"Vesper Quill", player:"Emelie", initial:"V",
+    klass:"Warlock", subclass:"The Archfey", species:"Tiefling", level:5, background:"Charlatan", alignment:"chaotic_good",
     quote:'"I made a bargain with something that laughs in the dark. It\'s been very generous."',
-    str:8, dex:14, con:14, int:11, wis:12, cha:18,
-    ac:14, speed:30, hpMax:37, hpCur:37, hpTemp:0, hitDie:"d8", hdTotal:5, hdRem:5,
-    saves:["wisdom","charisma"], spellAbil:"charisma",
-    deathS:0, deathF:0,
+    str:8, dex:14, con:14, int:11, wis:12, cha:18, ac:14, speed:30, hpMax:37, hpCur:37, hpTemp:0,
+    hitDie:"d8", hdTotal:5, hdRem:5, saves:["wisdom","charisma"], spellAbil:"charisma", deathS:0, deathF:0,
     coins:{cp:0,sp:12,ep:2,gp:41,pp:1},
     skills:[["deception",true],["persuasion",false],["arcana",false],["intimidation",false],["insight",false]],
     slots:[{kind:"pact",level:3,total:2,used:1}],
-    spells:[
-      ["Eldritch Blast",0,"1d10 force, twice at level 5"],
-      ["Minor Illusion",0,"a sound or image, palm‑sized lie"],
-      ["Prestidigitation",0,"the charlatan's favourite"],
-      ["Hex",1,"curse a target, +1d6 necrotic"],
-      ["Charm Person",1,"a friend, briefly and against their will"],
-      ["Misty Step",2,"30 ft, bonus action, gone"],
-      ["Hunger of Hadar",3,"a sphere of cold and clicking dark"],
-      ["Fly",3,"the Archfey's gift, for a while"]
-    ],
-    items:[
-      ["Rod of the Pact Keeper +1","att",1,"your spell attacks bite a little deeper"],
-      ["Studded leather","eq",1,""],
-      ["Dagger","eq",2,""],
-      ["Fine clothes & a forged writ of nobility","",1,"the charlatan's toolkit"],
-      ["Potion of healing","",2,"2d4+2, when the bargain isn't enough"]
-    ]
-  },
-  {
-    id:"brann", name:"Brann Ashfoot", player:"Table NPC", initial:"B",
-    klass:"Fighter", subclass:"Battle Master", species:"Dwarf", level:5, background:"Soldier",
-    alignment:"lawful_neutral",
+    spells:[["Eldritch Blast",0,"1d10 force, twice at level 5"],["Minor Illusion",0,"a sound or image, palm‑sized lie"],["Prestidigitation",0,"the charlatan's favourite"],["Hex",1,"curse a target, +1d6 necrotic"],["Charm Person",1,"a friend, briefly and against their will"],["Misty Step",2,"30 ft, bonus action, gone"],["Hunger of Hadar",3,"a sphere of cold and clicking dark"],["Fly",3,"the Archfey's gift, for a while"]],
+    items:[["Rod of the Pact Keeper +1","att",1,"your spell attacks bite a little deeper"],["Studded leather","eq",1,""],["Dagger","eq",2,""],["Fine clothes & a forged writ of nobility","",1,"the charlatan's toolkit"],["Potion of healing","",2,"2d4+2, when the bargain isn't enough"]] },
+  { id:"brann", name:"Brann Ashfoot", player:"Table NPC", initial:"B",
+    klass:"Fighter", subclass:"Battle Master", species:"Dwarf", level:5, background:"Soldier", alignment:"lawful_neutral",
     quote:'"Talk later. Shield up now."',
-    str:17, dex:12, con:16, int:10, wis:13, cha:8,
-    ac:18, speed:25, hpMax:49, hpCur:31, hpTemp:0, hitDie:"d10", hdTotal:5, hdRem:3,
-    saves:["strength","constitution"], spellAbil:null,
-    deathS:0, deathF:0,
+    str:17, dex:12, con:16, int:10, wis:13, cha:8, ac:18, speed:25, hpMax:49, hpCur:31, hpTemp:0,
+    hitDie:"d10", hdTotal:5, hdRem:3, saves:["strength","constitution"], spellAbil:null, deathS:0, deathF:0,
     coins:{cp:30,sp:5,ep:0,gp:22,pp:0},
     skills:[["athletics",true],["intimidation",false],["perception",false],["survival",false]],
-    slots:[],
-    spells:[],
-    items:[
-      ["Longsword","eq",1,""],["Shield","eq",1,""],["Chain mail","eq",1,""],
-      ["Handaxe","",2,"for throwing"],["Rations","",5,""]
-    ]
-  },
-  {
-    id:"sable", name:"Sable Wren", player:"Table NPC", initial:"S",
-    klass:"Cleric", subclass:"Light Domain", species:"Half‑Elf", level:5, background:"Acolyte",
-    alignment:"neutral_good",
+    slots:[], spells:[],
+    items:[["Longsword","eq",1,""],["Shield","eq",1,""],["Chain mail","eq",1,""],["Handaxe","",2,"for throwing"],["Rations","",5,""]] },
+  { id:"sable", name:"Sable Wren", player:"Table NPC", initial:"S",
+    klass:"Cleric", subclass:"Light Domain", species:"Half‑Elf", level:5, background:"Acolyte", alignment:"neutral_good",
     quote:'"The dark down there has a name. I intend to say it out loud."',
-    str:10, dex:12, con:14, int:11, wis:18, cha:13,
-    ac:17, speed:30, hpMax:38, hpCur:38, hpTemp:6, hitDie:"d8", hdTotal:5, hdRem:5,
-    saves:["wisdom","charisma"], spellAbil:"wisdom",
-    deathS:0, deathF:0,
+    str:10, dex:12, con:14, int:11, wis:18, cha:13, ac:17, speed:30, hpMax:38, hpCur:38, hpTemp:6,
+    hitDie:"d8", hdTotal:5, hdRem:5, saves:["wisdom","charisma"], spellAbil:"wisdom", deathS:0, deathF:0,
     coins:{cp:0,sp:0,ep:0,gp:63,pp:3},
     skills:[["medicine",false],["religion",true],["insight",false],["persuasion",false]],
-    slots:[
-      {kind:"standard",level:1,total:4,used:2},
-      {kind:"standard",level:2,total:3,used:1},
-      {kind:"standard",level:3,total:2,used:0}
-    ],
-    spells:[
-      ["Sacred Flame",0,"1d8 radiant, no cover for the wicked"],
-      ["Light",0,"literally the domain"],
-      ["Cure Wounds",1,"1d8 + 4"],
-      ["Guiding Bolt",1,"4d6 radiant, next hit has advantage"],
-      ["Scorching Ray",2,"three darts of fire"],
-      ["Spirit Guardians",3,"a halo of vengeful light"],
-      ["Daylight",3,"the dark's least favourite spell"]
-    ],
-    items:[
-      ["Mace","eq",1,""],["Chain mail","eq",1,""],["Shield","eq",1,""],
-      ["Holy symbol (sunburst)","att",1,"channels the domain's fire"],
-      ["Potion of healing","",1,""]
-    ]
-  }
+    slots:[{kind:"standard",level:1,total:4,used:2},{kind:"standard",level:2,total:3,used:1},{kind:"standard",level:3,total:2,used:0}],
+    spells:[["Sacred Flame",0,"1d8 radiant, no cover for the wicked"],["Light",0,"literally the domain"],["Cure Wounds",1,"1d8 + 4"],["Guiding Bolt",1,"4d6 radiant, next hit has advantage"],["Scorching Ray",2,"three darts of fire"],["Spirit Guardians",3,"a halo of vengeful light"],["Daylight",3,"the dark's least favourite spell"]],
+    items:[["Mace","eq",1,""],["Chain mail","eq",1,""],["Shield","eq",1,""],["Holy symbol (sunburst)","att",1,"channels the domain's fire"],["Potion of healing","",1,""]] }
 ];
+const cloneMock = () => MOCK.map(c => JSON.parse(JSON.stringify(c)));
 
-/* ===================== STORY / ENCOUNTER / NOTES mock ===================== */
+let PARTY = cloneMock();
+let current = PARTY[0];
+
+/* ===================== LIVE DATA LAYER (Supabase → app model) ===================== */
+function mapChar(r, sk, sl, sp, it) {
+  return {
+    dbId: r.id, id: r.id, name: r.name, player: r.player_name || "", initial: (r.name || "?").trim()[0] || "?",
+    klass: r.class, subclass: r.subclass || "", species: r.species, level: r.level,
+    background: r.background || "", alignment: r.alignment || null,
+    quote: r.notes || "",
+    str: r.strength, dex: r.dexterity, con: r.constitution, int: r.intelligence, wis: r.wisdom, cha: r.charisma,
+    ac: r.armor_class, speed: r.speed, hpMax: r.hp_max, hpCur: r.hp_current, hpTemp: r.hp_temp,
+    hitDie: r.hit_die, hdTotal: r.hit_dice_total, hdRem: r.hit_dice_remaining,
+    saves: r.save_proficiencies || [], spellAbil: r.spellcasting_ability,
+    deathS: r.death_save_successes, deathF: r.death_save_failures,
+    coins: { cp:r.coins_cp, sp:r.coins_sp, ep:r.coins_ep, gp:r.coins_gp, pp:r.coins_pp },
+    skills: sk.map(x => [x.skill, x.expertise]),
+    slots: sl.map(x => ({ kind:x.slot_kind, level:x.slot_level, total:x.slots_total, used:x.slots_expended }))
+            .sort((a,b) => (a.kind===b.kind ? a.level-b.level : a.kind.localeCompare(b.kind))),
+    spells: sp.map(x => [x.name, x.spell_level, x.notes || ""]).sort((a,b) => a[1]-b[1] || a[0].localeCompare(b[0])),
+    items: it.map(x => [x.name, x.equipped ? "eq" : (x.attuned ? "att" : ""), x.quantity, x.notes || ""])
+  };
+}
+async function loadParty() {
+  // Shared vault: any signed-in user reads the whole party (no per-row owner).
+  const from = t => sb.schema(RPG).from(t);
+  const { data: chars, error } = await from("characters").select("*");
+  if (error) throw error;
+  if (!chars || !chars.length) return [];
+  const ids = chars.map(c => c.id);
+  const [sk, sl, sp, it] = await Promise.all([
+    from("character_skills").select("*").in("character_id", ids),
+    from("character_spell_slots").select("*").in("character_id", ids),
+    from("character_spells").select("*").in("character_id", ids),
+    from("character_items").select("*").in("character_id", ids)
+  ]);
+  const pick = (res, id) => (res.data || []).filter(x => x.character_id === id);
+  // players (named characters) first, then the rest, each alphabetical
+  chars.sort((a,b) => ((b.player_name?1:0) - (a.player_name?1:0)) || a.name.localeCompare(b.name));
+  return chars.map(c => mapChar(c, pick(sk,c.id), pick(sl,c.id), pick(sp,c.id), pick(it,c.id)));
+}
+async function persist(c, patch) {
+  if (!c.dbId || demoMode || !LIVE) return;
+  try {
+    const { error } = await sb.schema(RPG).from("characters").update(patch).eq("id", c.dbId);
+    if (error) throw error;
+    toast("Saved to the vault");
+  } catch (e) { toast("Couldn't save: " + (e.message || e), true); }
+}
+async function persistSlot(c, s) {
+  if (!c.dbId || demoMode || !LIVE) return;
+  try {
+    const { error } = await sb.schema(RPG).from("character_spell_slots")
+      .update({ slots_expended: s.used })
+      .eq("character_id", c.dbId).eq("slot_kind", s.kind).eq("slot_level", s.level);
+    if (error) throw error;
+    toast("Saved to the vault");
+  } catch (e) { toast("Couldn't save: " + (e.message || e), true); }
+}
+
+let toastT = null;
+function toast(msg, isErr) {
+  const t = document.getElementById("toast");
+  document.getElementById("toastMsg").textContent = msg;
+  t.classList.toggle("err", !!isErr);
+  t.classList.add("on");
+  clearTimeout(toastT);
+  toastT = setTimeout(() => t.classList.remove("on"), 2200);
+}
+
+/* ===================== STORY / ENCOUNTER / NOTES (local only) ===================== */
 const SCENES = [
-  {t:"The bell that rings itself", when:"dusk", state:"done",
-   d:"You arrived as the harbour bell tolled with no ringer in the tower. The townsfolk have stopped counting the tolls out loud — they say it's bad luck to know the number."},
-  {t:"The harbourmaster's bargain", when:"nightfall", state:"done",
-   d:"Old Maren Coyle admitted the town has been feeding the bell — coins, then trinkets, then, lately, things that were harder to give. She wouldn't say what tonight's offering was."},
-  {t:"Down to the tide‑cellar", when:"now", state:"now",
-   d:"A stair behind the fish‑market leads below the waterline. Salt‑swollen doors, a smell of old copper, and somewhere ahead, the sound of something wet dragging chain."},
-  {t:"The thing that counts the hours", when:"—", state:"todo",
-   d:"Not yet. Whatever waits at the bottom of the stair is still just a shape in the GM's notes."}
+  {t:"The bell that rings itself", when:"dusk", state:"done", d:"You arrived as the harbour bell tolled with no ringer in the tower. The townsfolk have stopped counting the tolls out loud — they say it's bad luck to know the number."},
+  {t:"The harbourmaster's bargain", when:"nightfall", state:"done", d:"Old Maren Coyle admitted the town has been feeding the bell — coins, then trinkets, then, lately, things that were harder to give. She wouldn't say what tonight's offering was."},
+  {t:"Down to the tide‑cellar", when:"now", state:"now", d:"A stair behind the fish‑market leads below the waterline. Salt‑swollen doors, a smell of old copper, and somewhere ahead, the sound of something wet dragging chain."},
+  {t:"The thing that counts the hours", when:"—", state:"todo", d:"Not yet. Whatever waits at the bottom of the stair is still just a shape in the GM's notes."}
 ];
-const NPCS = [
-  ["Maren Coyle","Harbourmaster","knows more than she's told"],
-  ["Little Pell","Bell‑ringer's boy","hasn't been seen since Tuesday"],
-  ["The Drowned Choir","???","heard, not yet met"]
-];
+const NPCS = [["Maren Coyle","Harbourmaster","knows more than she's told"],["Little Pell","Bell‑ringer's boy","hasn't been seen since Tuesday"],["The Drowned Choir","???","heard, not yet met"]];
 const SECRETS = [
   ["Why the bell rings","The bell is a lock, not an instrument. Each toll is the drowned thing testing the last knot of an old binding. When the tolls reach thirteen in one night, the binding fails.","earned"],
   ["Little Pell's whereabouts","Pell is alive — the town gave him to the tide‑cellar as tonight's offering, and Maren has been sick with it ever since. He's in a cage below the waterline, and the water is rising.","hidden"],
   ["The bargain's true price","Vesper's Archfey patron has a claim on anything sworn under running water. If she bargains with the drowned thing directly, her patron collects — from her.","hidden"]
 ];
-let COMBAT = {
-  round:2, turn:0,
-  list:[
-    {name:"Sable Wren", side:"pc", init:19, hp:38, max:38},
-    {name:"Vesper Quill", side:"pc", init:17, hp:37, max:37},
-    {name:"Drowned Tollman", side:"foe", init:14, hp:22, max:52},
-    {name:"Brann Ashfoot", side:"pc", init:12, hp:31, max:49},
-    {name:"Barnacle Thrall", side:"foe", init:9, hp:0, max:19},
-    {name:"Barnacle Thrall", side:"foe", init:7, hp:11, max:19}
-  ]
-};
+let COMBAT = { round:2, turn:0, list:[
+  {name:"Sable Wren", side:"pc", init:19, hp:38, max:38},
+  {name:"Vesper Quill", side:"pc", init:17, hp:37, max:37},
+  {name:"Drowned Tollman", side:"foe", init:14, hp:22, max:52},
+  {name:"Brann Ashfoot", side:"pc", init:12, hp:31, max:49},
+  {name:"Barnacle Thrall", side:"foe", init:9, hp:0, max:19},
+  {name:"Barnacle Thrall", side:"foe", init:7, hp:11, max:19}
+]};
 let NOTES = [
   {t:"Don't sign anything", b:"Not near the water. Patron's fine print — running water = his jurisdiction. Sable warned me twice, which means she's worried.", pin:true, when:"round 1"},
   {t:"Maren is lying about Pell", b:"She flinched when Brann said the boy's name. Whatever's below, she put it there. Keep her close.", pin:false, when:"nightfall"},
@@ -808,151 +685,109 @@ let NOTES = [
 ];
 
 /* ===================== RENDER ===================== */
-let current = PARTY[0];
 const $ = s => document.querySelector(s);
 
-function renderSwitcher(){
+function renderSwitcher() {
   $("#switcher").innerHTML = PARTY.map(p =>
     `<button class="${p.id===current.id?'on':''}" data-id="${p.id}" title="${p.name}">${p.initial}</button>`).join("");
   $("#switcher").querySelectorAll("button").forEach(b =>
-    b.onclick = () => { current = PARTY.find(p=>p.id===b.dataset.id); renderAll(); });
+    b.onclick = () => { current = PARTY.find(p => p.id === b.dataset.id); renderSheet(); renderSwitcher(); });
 }
 
-function renderSheet(){
+function renderSheet() {
   const c = current, pb = profBonus(c.level);
   $("#tbCrest").textContent = c.initial;
   $("#tbName").textContent = c.name;
-  $("#tbSub").innerHTML = `Level ${c.level} ${c.species} ${c.klass} · <b>${c.subclass}</b>`;
+  $("#tbSub").innerHTML = `Level ${c.level} ${c.species} ${c.klass}${c.subclass?` · <b>${c.subclass}</b>`:''}`;
   $("#shName").textContent = c.name;
-  $("#shTag").textContent = c.quote;
+  $("#shTag").textContent = c.quote || `${c.background||c.klass} · ${(c.alignment||'').replace(/_/g,' ')}`;
 
-  // vitals
   $("#hpCur").textContent = c.hpCur; $("#hpMax").textContent = c.hpMax;
   $("#hpBar").style.width = Math.max(0,(c.hpCur/c.hpMax*100)) + "%";
   const tb = $("#hpTempBadge");
-  tb.textContent = `+${c.hpTemp} temp`;
-  tb.style.display = c.hpTemp>0 ? "" : "none";
+  tb.textContent = `+${c.hpTemp} temp`; tb.style.display = c.hpTemp>0 ? "" : "none";
   $("#tempSeg").style.width = Math.min(40, c.hpTemp/c.hpMax*100) + "%";
 
-  // death saves
-  const pips = (cls,n,filled,fn) => Array.from({length:3},(_,i)=>
-    `<span class="pip ${cls} ${i<filled?'on':''}" data-i="${i}"></span>`).join("");
-  $("#succRow").innerHTML = pips("succ",3,c.deathS);
-  $("#failRow").innerHTML = pips("fail",3,c.deathF);
-  $("#succRow").querySelectorAll(".pip").forEach(p=>p.onclick=()=>{ c.deathS = (+p.dataset.i)+1===c.deathS?+p.dataset.i:(+p.dataset.i)+1; renderSheet(); });
-  $("#failRow").querySelectorAll(".pip").forEach(p=>p.onclick=()=>{ c.deathF = (+p.dataset.i)+1===c.deathF?+p.dataset.i:(+p.dataset.i)+1; renderSheet(); });
+  const pips = (cls,filled) => Array.from({length:3},(_,i)=>`<span class="pip ${cls} ${i<filled?'on':''}" data-i="${i}"></span>`).join("");
+  $("#succRow").innerHTML = pips("succ",c.deathS);
+  $("#failRow").innerHTML = pips("fail",c.deathF);
+  $("#succRow").querySelectorAll(".pip").forEach(p=>p.onclick=()=>{ c.deathS = (+p.dataset.i)+1===c.deathS?+p.dataset.i:(+p.dataset.i)+1; renderSheet(); persist(c,{death_save_successes:c.deathS}); });
+  $("#failRow").querySelectorAll(".pip").forEach(p=>p.onclick=()=>{ c.deathF = (+p.dataset.i)+1===c.deathF?+p.dataset.i:(+p.dataset.i)+1; renderSheet(); persist(c,{death_save_failures:c.deathF}); });
 
-  // defenses
   $("#sAC").textContent = c.ac;
   $("#sSpd").innerHTML = `${c.speed}<small>ft</small>`;
   $("#sProf").textContent = sgn(pb);
   const perc = c.skills.find(s=>s[0]==="perception");
-  const pp = 10 + mod(c.wis) + (perc ? pb*(perc[1]?2:1) : 0);
-  $("#sPP").textContent = pp;
+  $("#sPP").textContent = 10 + mod(c.wis) + (perc ? pb*(perc[1]?2:1) : 0);
   $("#hitDice").textContent = `${c.hdRem} / ${c.hdTotal} · ${c.hitDie}`;
 
-  // coins
   const coinMeta = {pp:["#e6e8ec","PP"],gp:["#e8c14e","GP"],ep:["#c7cdb0","EP"],sp:["#cfd4da","SP"],cp:["#c8875a","CP"]};
   $("#coins").innerHTML = ["pp","gp","ep","sp","cp"].map(k=>{
     const [col,lab]=coinMeta[k];
     return `<div class="coin"><span class="disc" style="background:radial-gradient(circle at 35% 30%, #fff8, ${col})">${lab[0]}</span><span class="amt">${c.coins[k]}</span><span class="cn">${lab}</span></div>`;
   }).join("");
 
-  // abilities
   $("#abilities").innerHTML = ABILS.map(a=>{
-    const isSave = c.saves.includes(a);
-    return `<div class="abil ${isSave?'save':''}">
-      <div class="k">${a.slice(0,3)}</div>
-      <div class="mod">${sgn(mod(c[a.slice(0,3)]))}</div>
-      <div class="score mono">${c[a.slice(0,3)]}${isSave?` · save ${sgn(mod(c[a.slice(0,3)])+pb)}`:''}</div>
-    </div>`;
+    const k = a.slice(0,3), isSave = c.saves.includes(a);
+    return `<div class="abil ${isSave?'save':''}"><div class="k">${k}</div><div class="mod">${sgn(mod(c[k]))}</div><div class="score mono">${c[k]}${isSave?` · save ${sgn(mod(c[k])+pb)}`:''}</div></div>`;
   }).join("");
 
-  // skills — derived bonus = ability mod + (prof? pb : 0) *(exp?2:1)
   const skillMap = Object.fromEntries(c.skills.map(s=>[s[0],s[1]]));
   $("#skills").innerHTML = Object.keys(SKILL_ABIL).sort().map(sk=>{
-    const abil = SKILL_ABIL[sk];
-    const proficient = sk in skillMap;
-    const exp = skillMap[sk];
+    const abil = SKILL_ABIL[sk], proficient = sk in skillMap, exp = skillMap[sk];
     const bonus = mod(c[abil.slice(0,3)]) + (proficient ? pb*(exp?2:1) : 0);
-    return `<div class="skill ${proficient?'prof':''} ${exp?'exp':''}">
-      <span class="dot"></span><span class="nm">${titleCase(sk)}</span>
-      <span class="ab">${abil.slice(0,3)}</span><span class="bonus">${sgn(bonus)}</span></div>`;
+    return `<div class="skill ${proficient?'prof':''} ${exp?'exp':''}"><span class="dot"></span><span class="nm">${titleCase(sk)}</span><span class="ab">${abil.slice(0,3)}</span><span class="bonus">${sgn(bonus)}</span></div>`;
   }).join("");
 
-  // spell slots
-  const spDC = c.spellAbil ? 8 + pb + mod(c[c.spellAbil.slice(0,3)]) : null;
   const slotHost = $("#slots");
   if(!c.slots.length){
     slotHost.innerHTML = `<p style="color:var(--ink-faint);font-size:.85rem;margin:2px 0">No spellcasting — this one settles things with steel.</p>`;
   } else {
-    let html = `<div style="font-family:var(--mono);font-size:.66rem;color:var(--ink-faint);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">Spell save DC ${spDC} · atk ${sgn(pb+mod(c[c.spellAbil.slice(0,3)]))}</div>`;
+    const k = c.spellAbil ? c.spellAbil.slice(0,3) : null;
+    const spDC = k ? 8 + pb + mod(c[k]) : null;
+    let html = k ? `<div style="font-family:var(--mono);font-size:.66rem;color:var(--ink-faint);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">Spell save DC ${spDC} · atk ${sgn(pb+mod(c[k]))}</div>` : "";
     html += c.slots.map((s,si)=>{
-      const pips = Array.from({length:s.total},(_,i)=>
-        `<button class="slot ${s.kind==='pact'?'pact':''} ${i>=s.used?'full':''}" data-si="${si}" data-i="${i}" aria-label="slot"></button>`).join("");
+      const pipsH = Array.from({length:s.total},(_,i)=>`<button class="slot ${s.kind==='pact'?'pact':''} ${i>=s.used?'full':''}" data-si="${si}" data-i="${i}" aria-label="slot"></button>`).join("");
       const label = s.kind==="pact" ? `Pact <small>lvl ${s.level} · short rest</small>` : `Level ${s.level}`;
-      return `<div class="slotrow"><span class="lvl">${label}</span><div class="slots">${pips}</div></div>`;
+      return `<div class="slotrow"><span class="lvl">${label}</span><div class="slots">${pipsH}</div></div>`;
     }).join("");
     slotHost.innerHTML = html;
     slotHost.querySelectorAll(".slot").forEach(b=>b.onclick=()=>{
-      const s=c.slots[+b.dataset.si], i=+b.dataset.i;
-      // click toggles this slot: filled -> expend, empty -> restore
-      const isFull = i>=s.used;
-      s.used = isFull ? (s.total - i) : (s.total - i - 1);
-      s.used = Math.max(0, Math.min(s.total, s.used));
-      renderSheet();
+      const s=c.slots[+b.dataset.si], i=+b.dataset.i, isFull = i>=s.used;
+      s.used = Math.max(0, Math.min(s.total, isFull ? (s.total - i) : (s.total - i - 1)));
+      renderSheet(); persistSlot(c, s);
     });
   }
 
-  // spells
   $("#spells").innerHTML = c.spells.length ? c.spells.map(([n,lv,note])=>
-    `<div class="li"><span class="badge ${lv===0?'cantrip':''}">${lv===0?'C':lv}</span>
-      <span class="nm">${n}<small>${note}</small></span></div>`).join("")
+    `<div class="li"><span class="badge ${lv===0?'cantrip':''}">${lv===0?'C':lv}</span><span class="nm">${n}${note?`<small>${note}</small>`:''}</span></div>`).join("")
     : `<p style="color:var(--ink-faint);font-size:.85rem">No spells known.</p>`;
 
-  // items
   $("#items").innerHTML = c.items.map(([n,flag,qty,note])=>{
-    let tag = "";
-    if(flag==="eq") tag = `<span class="tag on">equipped</span>`;
-    else if(flag==="att") tag = `<span class="tag att">attuned</span>`;
-    return `<div class="li"><span class="nm">${n}${note?`<small>${note}</small>`:''}</span>
-      ${qty>1?`<span class="qty">×${qty}</span>`:''}${tag}</div>`;
+    let tag = flag==="eq" ? `<span class="tag on">equipped</span>` : flag==="att" ? `<span class="tag att">attuned</span>` : "";
+    return `<div class="li"><span class="nm">${n}${note?`<small>${note}</small>`:''}</span>${qty>1?`<span class="qty">×${qty}</span>`:''}${tag}</div>`;
   }).join("");
 }
 
-function renderStory(){
+function renderStory() {
   $("#scenes").innerHTML = SCENES.map(s=>{
     const cls = s.state==="now"?"now":s.state==="done"?"done":"";
-    const chip = s.state==="now"?`<span class="chip now">you are here</span>`
-              : s.state==="done"?`<span class="chip done">done</span>`:"";
-    return `<div class="scene ${cls}"><span class="node"></span>
-      <div class="scene-item"><h4>${s.t} ${chip}</h4>
-      <span class="when">${s.when}</span><p>${s.d}</p></div></div>`;
+    const chip = s.state==="now"?`<span class="chip now">you are here</span>`:s.state==="done"?`<span class="chip done">done</span>`:"";
+    return `<div class="scene ${cls}"><span class="node"></span><div class="scene-item"><h4>${s.t} ${chip}</h4><span class="when">${s.when}</span><p>${s.d}</p></div></div>`;
   }).join("");
-  $("#npcs").innerHTML = NPCS.map(([n,r,note])=>
-    `<div class="li"><span class="nm">${n}<small>${r} — ${note}</small></span></div>`).join("");
+  $("#npcs").innerHTML = NPCS.map(([n,r,note])=>`<div class="li"><span class="nm">${n}<small>${r} — ${note}</small></span></div>`).join("");
   $("#secrets").innerHTML = SECRETS.map(([t,body,state],i)=>{
     const lockLabel = state==="earned" ? "revealed at the table" : "not yet earned";
-    return `<div class="secret" data-i="${i}">
-      <button>${state==="earned"?"◈":"🔒"} ${t} <span style="margin-left:auto;font-size:.6rem;color:var(--ink-faint)">${lockLabel}</span></button>
-      <div class="body">${body}</div></div>`;
+    return `<div class="secret" data-i="${i}"><button>${state==="earned"?"◈":"🔒"} ${t} <span style="margin-left:auto;font-size:.6rem;color:var(--ink-faint)">${lockLabel}</span></button><div class="body">${body}</div></div>`;
   }).join("");
-  $("#secrets").querySelectorAll(".secret button").forEach(b=>
-    b.onclick=()=>b.parentElement.classList.toggle("open"));
+  $("#secrets").querySelectorAll(".secret button").forEach(b=>b.onclick=()=>b.parentElement.classList.toggle("open"));
 }
 
-function renderEnc(){
+function renderEnc() {
   $("#roundNo").textContent = COMBAT.round;
-  const order = COMBAT.list;
-  $("#combatants").innerHTML = order.map((c,i)=>{
+  $("#combatants").innerHTML = COMBAT.list.map((c,i)=>{
     const downed = c.hp<=0;
-    return `<div class="combatant ${c.side==='foe'?'foe':''} ${i===COMBAT.turn?'active':''} ${downed?'downed':''}" data-i="${i}">
-      <div class="init">${c.init}</div>
-      <div><div class="cnm">${c.name}<small>${c.side==='foe'?'adversary':'party'}</small></div>
-        <div class="cbar"><i style="width:${Math.max(0,c.hp/c.max*100)}%"></i></div></div>
-      <div class="hpn">${c.hp} / ${c.max}
-        <button data-d="-1" data-i="${i}">−</button><button data-d="1" data-i="${i}">+</button></div>
-    </div>`;
+    return `<div class="combatant ${c.side==='foe'?'foe':''} ${i===COMBAT.turn?'active':''} ${downed?'downed':''}" data-i="${i}"><div class="init">${c.init}</div><div><div class="cnm">${c.name}<small>${c.side==='foe'?'adversary':'party'}</small></div><div class="cbar"><i style="width:${Math.max(0,c.hp/c.max*100)}%"></i></div></div><div class="hpn">${c.hp} / ${c.max}<button data-d="-1" data-i="${i}">−</button><button data-d="1" data-i="${i}">+</button></div></div>`;
   }).join("");
   $("#combatants").querySelectorAll("button").forEach(b=>b.onclick=(e)=>{
     e.stopPropagation();
@@ -961,28 +796,14 @@ function renderEnc(){
     renderEnc();
   });
 }
-$("#nextTurn").onclick = () => {
-  COMBAT.turn++;
-  if(COMBAT.turn >= COMBAT.list.length){ COMBAT.turn = 0; COMBAT.round++; }
-  renderEnc();
-};
-$("#prevTurn").onclick = () => {
-  COMBAT.turn--;
-  if(COMBAT.turn < 0){ COMBAT.turn = COMBAT.list.length-1; COMBAT.round = Math.max(1, COMBAT.round-1); }
-  renderEnc();
-};
+$("#nextTurn").onclick = () => { COMBAT.turn++; if(COMBAT.turn>=COMBAT.list.length){ COMBAT.turn=0; COMBAT.round++; } renderEnc(); };
+$("#prevTurn").onclick = () => { COMBAT.turn--; if(COMBAT.turn<0){ COMBAT.turn=COMBAT.list.length-1; COMBAT.round=Math.max(1,COMBAT.round-1); } renderEnc(); };
 
-function renderNotes(){
+function renderNotes() {
   const host = $("#notes");
   host.innerHTML = NOTES.map((n,i)=>
-    `<div class="note ${n.pin?'pin':''}"><button class="del" data-i="${i}" aria-label="Delete">✕</button>
-      <h4>${n.pin?'★ ':''}${n.t}</h4><p>${n.b}</p>
-      <div class="meta"><span>${n.when}</span><span>${n.pin?'pinned':'note'}</span></div></div>`).join("")
-    + `<div class="note note-new">
-        <input id="noteTitle" placeholder="A title you'll recognise" />
-        <textarea id="noteBody" rows="3" placeholder="What must not be forgotten…"></textarea>
-        <div class="row"><button class="btn btn-gold" style="margin:0;padding:9px" id="addNote">Pin it to the margin</button></div>
-      </div>`;
+    `<div class="note ${n.pin?'pin':''}"><button class="del" data-i="${i}" aria-label="Delete">✕</button><h4>${n.pin?'★ ':''}${n.t}</h4><p>${n.b}</p><div class="meta"><span>${n.when}</span><span>${n.pin?'pinned':'note'}</span></div></div>`).join("")
+    + `<div class="note note-new"><input id="noteTitle" placeholder="A title you'll recognise" /><textarea id="noteBody" rows="3" placeholder="What must not be forgotten…"></textarea><div class="row"><button class="btn btn-gold" style="margin:0;padding:9px" id="addNote">Pin it to the margin</button></div></div>`;
   host.querySelectorAll(".del").forEach(b=>b.onclick=()=>{ NOTES.splice(+b.dataset.i,1); renderNotes(); });
   $("#addNote").onclick=()=>{
     const t=$("#noteTitle").value.trim(), b=$("#noteBody").value.trim();
@@ -1000,10 +821,12 @@ $("#btnDmg").onclick = () => {
   let rem = amt;
   if(c.hpTemp>0){ const t=Math.min(c.hpTemp,rem); c.hpTemp-=t; rem-=t; }
   c.hpCur = Math.max(0, c.hpCur-rem); renderSheet();
+  persist(c,{hp_current:c.hpCur, hp_temp:c.hpTemp});
 };
 $("#btnHeal").onclick = () => {
   const c=current, amt=Math.max(0, +$("#hpAmt").value||0);
   c.hpCur = Math.min(c.hpMax, c.hpCur+amt); renderSheet();
+  persist(c,{hp_current:c.hpCur});
 };
 
 /* ===================== NAV ===================== */
@@ -1015,14 +838,13 @@ document.querySelectorAll(".navbtn[data-view]").forEach(b=>b.onclick=()=>{
 });
 
 /* ===================== THEME ===================== */
-const sun = 'M12 3v2M12 19v2M5 5l1.4 1.4M17.6 17.6L19 19M3 12h2M19 12h2M5 19l1.4-1.4M17.6 6.4L19 5M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z';
-const moon = 'M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z';
+const sunPath = 'M12 3v2M12 19v2M5 5l1.4 1.4M17.6 17.6L19 19M3 12h2M19 12h2M5 19l1.4-1.4M17.6 6.4L19 5M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z';
+const moonPath = 'M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z';
 $("#themeBtn").onclick = () => {
   const root = document.documentElement;
-  const dark = !(root.getAttribute("data-theme")==="dark" ||
-    (!root.getAttribute("data-theme") && matchMedia("(prefers-color-scheme: dark)").matches));
-  root.setAttribute("data-theme", dark ? "dark" : "light");
-  $("#themeIcon").innerHTML = `<path d="${dark?moon:sun}"/>`;
+  const goDark = !(root.getAttribute("data-theme")==="dark" || (!root.getAttribute("data-theme") && matchMedia("(prefers-color-scheme: dark)").matches));
+  root.setAttribute("data-theme", goDark ? "dark" : "light");
+  $("#themeIcon").innerHTML = `<path d="${goDark?moonPath:sunPath}"/>`;
 };
 
 /* ===================== DICE ===================== */
@@ -1041,9 +863,7 @@ function roll(sides){
       const val = 1 + Math.floor(Math.abs(Math.sin(ticks*78.233 + sides)*43758.5453)%1*sides);
       die.textContent = val;
       die.className = "roll-die" + (sides===20&&val===20?" crit":sides===20&&val===1?" fumble":"");
-      label.textContent = sides===20&&val===20?"a natural 20 — the bones favour you"
-                        : sides===20&&val===1?"a natural 1 — the dark laughs"
-                        : `d${sides} → ${val}`;
+      label.textContent = sides===20&&val===20?"a natural 20 — the bones favour you":sides===20&&val===1?"a natural 1 — the dark laughs":`d${sides} → ${val}`;
       const log=$("#rollLog");
       log.innerHTML = `<div>d${sides} → <b style="color:var(--ink-dim)">${val}</b></div>` + log.innerHTML;
       rolling=false;
@@ -1053,13 +873,120 @@ function roll(sides){
 $("#diceBtns").querySelectorAll("button").forEach(b=>b.onclick=()=>roll(+b.dataset.d));
 $("#fab").onclick=()=>$("#tray").classList.toggle("on");
 
-/* ===================== LOGIN FLOW ===================== */
-function enter(){
-  $("#login").style.display="none";
-  $("#app").classList.add("on");
-  renderAll();
+/* ===================== SESSION / AUTH ===================== */
+function showApp(){ $("#login").style.display="none"; $("#app").classList.add("on"); }
+function showLogin(){ $("#app").classList.remove("on"); $("#login").style.display="grid"; }
+
+function setLiveBadges(email){
+  const live = LIVE && !demoMode;
+  const pill = $("#livePill");
+  pill.textContent = live ? "live" : "demo";
+  pill.className = "pill " + (live ? "live" : "demo");
+  $("#whoEmail").textContent = email || (demoMode ? "guest at the table" : "");
+  $("#footState").textContent = live ? "Live — the shared vault" : "Demo mode (local, nothing saved)";
 }
-$("#loginForm").onsubmit = e => { e.preventDefault(); enter(); };
-$("#demoLink").onclick = enter;
-$("#logoutBtn").onclick = () => { $("#app").classList.remove("on"); $("#login").style.display="grid"; };
+
+async function enterLive(email){
+  demoMode = false;
+  try {
+    const party = await loadParty();
+    if(!party.length){
+      PARTY = cloneMock();
+      toast("The vault is empty — showing the demo party");
+    } else {
+      PARTY = party;
+    }
+    current = PARTY[0];
+    setLiveBadges(email);
+    renderAll(); showApp();
+  } catch (e) {
+    const msg = (e && (e.message || e.hint || e.details)) || String(e);
+    // The most common first-run cause: the rpg schema isn't exposed to the API.
+    const hint = /schema|PGRST106|not exposed|search_path/i.test(msg)
+      ? "The rpg schema isn't exposed to the API yet — add “rpg” under Supabase → Settings → API → Exposed schemas."
+      : msg;
+    authErr(hint, false);
+    throw e;
+  }
+}
+function enterDemo(){
+  demoMode = true; PARTY = cloneMock(); current = PARTY[0];
+  setLiveBadges(null); renderAll(); showApp();
+}
+
+function authErr(msg, info){
+  const el = $("#authErr");
+  el.textContent = msg || "";
+  el.classList.toggle("info", !!info);
+}
+function setAuthMode(m){
+  authMode = m;
+  $("#authBtn").textContent = m==="signup" ? "Forge the account" : "Enter the room";
+  $("#modeLine").innerHTML = m==="signup"
+    ? `Already sworn in? <span class="link" id="modeToggle">Sign in →</span>`
+    : `New to the table? <span class="link" id="modeToggle">Forge an account →</span>`;
+  $("#pw").setAttribute("autocomplete", m==="signup" ? "new-password" : "current-password");
+  $("#modeToggle").onclick = () => setAuthMode(m==="signup" ? "signin" : "signup");
+  authErr("");
+}
+
+async function doAuth(){
+  const email = $("#email").value.trim(), pw = $("#pw").value;
+  if(!email || !pw){ authErr("A mark and a passphrase, both."); return; }
+  if(pw.length < 6){ authErr("The passphrase needs at least six characters."); return; }
+  const btn = $("#authBtn"); btn.disabled = true;
+  const orig = btn.textContent; btn.textContent = authMode==="signup" ? "Forging…" : "Opening…";
+  try {
+    if(authMode==="signup"){
+      const { data, error } = await sb.auth.signUp({ email, password: pw });
+      if(error) throw error;
+      if(!data.session){                                  // email confirmation is on
+        authErr("Account forged. Check your email to confirm, then sign in.", true);
+        setAuthMode("signin");
+        return;
+      }
+      await enterLive(email);
+    } else {
+      const { error } = await sb.auth.signInWithPassword({ email, password: pw });
+      if(error) throw error;
+      await enterLive(email);
+    }
+  } catch (e) {
+    const m = (e && e.message) || String(e);
+    authErr(/already registered/i.test(m) ? "That mark is already sworn in — try signing in." : m);
+  } finally {
+    btn.disabled = false; btn.textContent = orig;
+  }
+}
+
+$("#loginForm").onsubmit = e => {
+  e.preventDefault();
+  if(LIVE) doAuth(); else enterDemo();
+};
+$("#demoLink").onclick = enterDemo;
+$("#logoutBtn").onclick = async () => {
+  if(LIVE && !demoMode && sb){ try { await sb.auth.signOut(); } catch(e){} }
+  $("#pw").value = ""; authErr("");
+  showLogin();
+};
+
+/* ===================== BOOT ===================== */
+(async function boot(){
+  setAuthMode("signin");
+  if(!LIVE){
+    // No backend reachable (e.g. inside the Artifact sandbox): demo only.
+    $("#statusPill").textContent = "demo only · no backend reachable";
+    $("#authBtn").textContent = "Explore the demo party";
+    $("#modeLine").style.display = "none";
+    return;
+  }
+  $("#statusPill").textContent = "live · supabase";
+  $("#statusPill").className = "pill live";
+  try {
+    const { data } = await sb.auth.getSession();
+    if(data && data.session){
+      await enterLive(data.session.user && data.session.user.email);
+    }
+  } catch(e){ /* stay on login */ }
+})();
 </script>
