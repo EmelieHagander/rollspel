@@ -255,8 +255,10 @@ button { font-family: inherit; cursor: pointer; }
 .coin .disc { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-family: var(--mono); font-size: .56rem; font-weight: 700; color: #201607; }
 .coin .amt { font-family: var(--mono); font-weight: 600; font-size: .85rem; }
 .coin .cn { font-family: var(--mono); font-size: .58rem; color: var(--ink-faint); text-transform: uppercase; }
-.coin .cbtn { width: 22px; height: 22px; border-radius: 7px; border: 1px solid var(--line); background: var(--panel); color: var(--ink-dim); font-weight: 700; line-height: 1; padding: 0; }
-.coin .cbtn:hover { color: var(--gold); border-color: var(--violet-dim); }
+.cbtn { width: 22px; height: 22px; border-radius: 7px; border: 1px solid var(--line); background: var(--panel); color: var(--ink-dim); font-weight: 700; line-height: 1; padding: 0; }
+.cbtn:hover { color: var(--gold); border-color: var(--violet-dim); }
+button.tag { cursor: pointer; background: var(--bg-2); }
+button.tag:hover { border-color: var(--violet-dim); }
 
 .scene { position: relative; padding: 0 0 4px 30px; }
 .scene::before { content: ""; position: absolute; left: 8px; top: 4px; bottom: 0; width: 2px; background: linear-gradient(var(--violet-dim), transparent); }
@@ -538,7 +540,7 @@ button { font-family: inherit; cursor: pointer; }
             </div>
           </div>
           <div class="card">
-            <div class="card-t">Satchel <span class="rule"></span></div>
+            <div class="card-t">Satchel <span class="rule"></span><button class="mini-btn" id="itemEdit">adjust</button></div>
             <div class="list" id="items"></div>
           </div>
         </div>
@@ -768,7 +770,11 @@ const MOCK = [
     spells:[["Sacred Flame",0,"1d8 radiant, no cover for the wicked"],["Light",0,"literally the domain"],["Cure Wounds",1,"1d8 + 4"],["Guiding Bolt",1,"4d6 radiant, next hit has advantage"],["Scorching Ray",2,"three darts of fire"],["Spirit Guardians",3,"a halo of vengeful light"],["Daylight",3,"the dark's least favourite spell"]],
     items:[["Mace","eq",1,""],["Chain mail","eq",1,""],["Shield","eq",1,""],["Holy symbol (sunburst)","att",1,"channels the domain's fire"],["Potion of healing","",1,""]] }
 ];
-const cloneMock = () => MOCK.map(c => JSON.parse(JSON.stringify(c)));
+const cloneMock = () => MOCK.map(c => {
+  const copy = JSON.parse(JSON.stringify(c));
+  copy.items = normalizeItems(copy.items);
+  return copy;
+});
 
 let PARTY = cloneMock();
 let current = PARTY[0];
@@ -791,8 +797,19 @@ function mapChar(r, sk, sl, sp, it) {
     slots: sl.map(x => ({ kind:x.slot_kind, level:x.slot_level, total:x.slots_total, used:x.slots_expended }))
             .sort((a,b) => (a.kind===b.kind ? a.level-b.level : a.kind.localeCompare(b.kind))),
     spells: sp.map(x => [x.name, x.spell_level, x.notes || ""]).sort((a,b) => a[1]-b[1] || a[0].localeCompare(b[0])),
-    items: it.map(x => [x.name, x.equipped ? "eq" : (x.attuned ? "att" : ""), x.quantity, x.notes || ""])
+    items: mapItems(it)
   };
+}
+function mapItems(rows) {
+  return rows.map(x => ({ id: x.id, name: x.name, qty: x.quantity,
+    equipped: !!x.equipped, attuned: !!x.attuned, notes: x.notes || "" }))
+    .sort((a,b) => (b.equipped - a.equipped) || a.name.localeCompare(b.name));
+}
+// the demo party authors items as [name, flag, qty, note] — normalize to the live shape
+function normalizeItems(arr) {
+  return arr.map(it => Array.isArray(it)
+    ? { id: null, name: it[0], equipped: it[1] === "eq", attuned: it[1] === "att", qty: it[2], notes: it[3] || "" }
+    : it);
 }
 async function loadParty() {
   // Shared vault: any signed-in user reads the whole party (no per-row owner).
@@ -1084,10 +1101,35 @@ function renderSheet() {
   $("#spells").querySelectorAll(".spell-row .li").forEach(r =>
     r.onclick = () => r.parentElement.classList.toggle("open"));
 
-  $("#items").innerHTML = c.items.map(([n,flag,qty,note])=>{
-    let tag = flag==="eq" ? `<span class="tag on">equipped</span>` : flag==="att" ? `<span class="tag att">attuned</span>` : "";
-    return `<div class="li"><span class="nm">${n}${note?`<small>${note}</small>`:''}</span>${qty>1?`<span class="qty">×${qty}</span>`:''}${tag}</div>`;
-  }).join("");
+  $("#items").innerHTML = c.items.length ? c.items.map((it, idx)=>{
+    let tags, qtyH;
+    if (itemEditMode) {
+      tags = `<button class="tag ${it.equipped?'on':''}" data-i="${idx}" data-t="equipped">equipped</button>`
+           + `<button class="tag ${it.attuned?'att':''}" data-i="${idx}" data-t="attuned">attuned</button>`;
+      qtyH = `<span class="qty"><button class="cbtn" data-i="${idx}" data-d="-1" aria-label="use one">−</button> ×${it.qty} <button class="cbtn" data-i="${idx}" data-d="1" aria-label="gain one">+</button></span>`;
+    } else {
+      tags = (it.equipped ? `<span class="tag on">equipped</span>` : "")
+           + (it.attuned ? `<span class="tag att">attuned</span>` : "");
+      qtyH = it.qty > 1 ? `<span class="qty">×${it.qty}</span>` : "";
+    }
+    return `<div class="li"><span class="nm">${esc(it.name)}${it.notes?`<small>${esc(it.notes)}</small>`:''}</span>${qtyH}${tags}</div>`;
+  }).join("") : `<p style="color:var(--ink-faint);font-size:.85rem">The satchel is empty.</p>`;
+  const persistItem = (it, patch) => {
+    if (!it.id || demoMode || !LIVE) return;
+    sb.schema(RPG).from("character_items").update(patch).eq("id", it.id)
+      .then(({error}) => { if (error) throw error; toast("Saved to the vault"); })
+      .catch(e => toast("Couldn't save: " + (e.message || e), true));
+  };
+  $("#items").querySelectorAll(".cbtn").forEach(b=>b.onclick=()=>{
+    const it = c.items[+b.dataset.i];
+    it.qty = Math.max(1, it.qty + (+b.dataset.d));   // the vault requires quantity > 0; the GM removes items outright
+    renderSheet(); persistItem(it, { quantity: it.qty });
+  });
+  $("#items").querySelectorAll("button.tag").forEach(b=>b.onclick=()=>{
+    const it = c.items[+b.dataset.i], t = b.dataset.t;
+    it[t] = !it[t];
+    renderSheet(); persistItem(it, { [t]: it[t] });
+  });
 }
 
 function renderStory() {
@@ -1354,6 +1396,12 @@ $("#coinEdit").onclick = () => {
   $("#coinEdit").textContent = coinEditMode ? "done" : "adjust";
   renderSheet();
 };
+let itemEditMode = false;
+$("#itemEdit").onclick = () => {
+  itemEditMode = !itemEditMode;
+  $("#itemEdit").textContent = itemEditMode ? "done" : "adjust";
+  renderSheet();
+};
 
 /* ===================== VAULT REFRESH (sheet stays honest between devices) =====================
    The GM and other players write the vault too; re-read the live numbers
@@ -1362,9 +1410,11 @@ async function refreshVitals() {
   if (!(LIVE && !demoMode) || !PARTY.length || !sb) return;
   const ids = PARTY.map(p => p.dbId).filter(Boolean);
   if (!ids.length) return;
-  const [chars, slots] = await Promise.all([
+  const [chars, slots, items, spells] = await Promise.all([
     sb.schema(RPG).from("characters").select("*").in("id", ids),
-    sb.schema(RPG).from("character_spell_slots").select("*").in("character_id", ids)
+    sb.schema(RPG).from("character_spell_slots").select("*").in("character_id", ids),
+    sb.schema(RPG).from("character_items").select("*").in("character_id", ids),
+    sb.schema(RPG).from("character_spells").select("*").in("character_id", ids)
   ]);
   if (chars.error || slots.error) return;
   (chars.data || []).forEach(r => {
@@ -1379,6 +1429,11 @@ async function refreshVitals() {
     p.slots = (slots.data || []).filter(s => s.character_id === r.id)
       .map(s => ({ kind: s.slot_kind, level: s.slot_level, total: s.slots_total, used: s.slots_expended }))
       .sort((a, b) => a.kind === b.kind ? a.level - b.level : a.kind.localeCompare(b.kind));
+    if (!items.error)
+      p.items = mapItems((items.data || []).filter(x => x.character_id === r.id));
+    if (!spells.error)
+      p.spells = (spells.data || []).filter(x => x.character_id === r.id)
+        .map(x => [x.name, x.spell_level, x.notes || ""]).sort((a,b) => a[1]-b[1] || a[0].localeCompare(b[0]));
   });
   // don't clobber a field the player is mid-typing in
   const typing = document.activeElement &&
