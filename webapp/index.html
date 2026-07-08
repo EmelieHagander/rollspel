@@ -1240,17 +1240,47 @@ function renderAdvParty(links) {
     return `<div class="li"><span class="nm">${c ? esc(c.name) : "An adventurer"}<small>${c ? `${esc(c.klass)} · level ${c.level}` : "not in the visible vault"}</small></span></div>`;
   }).join("") : `<p style="color:var(--ink-faint);font-size:.85rem">No characters bound to this adventure yet.</p>`;
 }
+/* Poll health: a phone that slept can wake with a stale session — every fetch
+   then fails silently and the stream freezes while the pill still says
+   "streaming". Track failures, try a session refresh, and say so honestly. */
+let pollFails = 0;
+function setPillState(ok) {
+  const pill = $("#advLivePill");
+  pill.textContent = ok ? "streaming" : "reconnecting…";
+  pill.className = "pill " + (ok ? "live" : "demo");
+}
+async function pollTick(fn) {
+  try {
+    await fn();
+    if (pollFails) setPillState(true);
+    pollFails = 0;
+  } catch (e) {
+    pollFails++;
+    setPillState(false);
+    if (pollFails === 2 && sb) { try { await sb.auth.refreshSession(); } catch (_) {} }
+  }
+}
+function pollActiveView() {
+  if (!(LIVE && !demoMode)) return;
+  if ($("#view-story").classList.contains("on") && ADV.id) pollTick(loadAdventureContent);
+  else if ($("#view-enc").classList.contains("on") && ADV.id) pollTick(loadBoard);
+  else if ($("#view-sheet").classList.contains("on")) pollTick(refreshVitals);
+  else if ($("#view-notes").classList.contains("on")) loadNotes().catch(() => {});
+}
 function advStartPoll() {
   advStopPoll();
   if (!(LIVE && !demoMode)) return;
   ADV.timer = setInterval(() => {
     if (document.visibilityState !== "visible") return;
-    if ($("#view-story").classList.contains("on") && ADV.id) loadAdventureContent().catch(() => {});
-    else if ($("#view-enc").classList.contains("on") && ADV.id) loadBoard().catch(() => {});
-    else if ($("#view-sheet").classList.contains("on")) refreshVitals().catch(() => {});
+    pollActiveView();
   }, 12000);
   $("#advLivePill").style.display = ADV.id ? "" : "none";
+  setPillState(true);
 }
+// waking from sleep / returning to the tab: catch up immediately, don't wait a tick
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") pollActiveView();
+});
 function advStopPoll() {
   if (ADV.timer) { clearInterval(ADV.timer); ADV.timer = null; }
   $("#advLivePill").style.display = "none";
