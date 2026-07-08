@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0009_complete_login_lockdown.sql
+-- 0010_complete_login_lockdown.sql
 --
 -- Completes the LOGIN-REQUIRED lockdown across the WHOLE rpg schema, after
 -- merging origin/main's parallel GM-surface workstream.
@@ -12,9 +12,9 @@
 --   0005_story_beats.sql then added story_beats with `story_beats_api_*`
 --   SELECT/INSERT policies that likewise name {anon, authenticated}.
 --
---   Our branch's 0006-0008 (formerly 0003-0005) chose LOGIN REQUIRED instead.
+--   Our branch's 0007-0009 (formerly 0003-0005) chose LOGIN REQUIRED instead.
 --   The OWNER has resolved the conflict in favour of login-required: the
---   parallel open-anon posture is OVERRIDDEN. 0008 already revoked anon on the
+--   parallel open-anon posture is OVERRIDDEN. 0009 already revoked anon on the
 --   character family and narrowed those five tables' `_api_*` policies to
 --   `authenticated`. This migration finishes the job for the objects the merge
 --   brought in (story_beats, session_notebook, adventures, session_events, and
@@ -22,7 +22,7 @@
 --
 -- What this does, all inside schema rpg:
 --   1. Narrow the `story_beats_api_*` permissive policies (still naming
---      {anon, authenticated}) to `authenticated` only, matching 0008 — via
+--      {anon, authenticated}) to `authenticated` only, matching 0009 — via
 --      ALTER POLICY, preserving each policy's name and USING/WITH CHECK.
 --   2. Revoke the anon DEFAULT PRIVILEGES that main's 0004 set, so FUTURE rpg
 --      tables/sequences no longer auto-grant anon. Plain form (no FOR ROLE):
@@ -36,7 +36,7 @@
 --      reach any object in rpg regardless of per-object grants or policies.
 --
 -- UNCHANGED:
---   * `authenticated` keeps its usage + table DML grants (0006) and full
+--   * `authenticated` keeps its usage + table DML grants (0007) and full
 --     read/write through the now-authenticated-only `_api_*` policies. On
 --     story_beats it keeps SELECT + INSERT only (the stream stays append-only
 --     for clients, per main's 0005 design).

@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0007_drop_per_user_layer.sql
+-- 0008_drop_per_user_layer.sql
 --
 -- RENUMBERED from 0004 after merging origin/main, whose parallel GM-surface
 -- workstream independently used 0003-0005 (adventures_and_gm_surface /
@@ -7,20 +7,20 @@
 -- and follow main's history. Already applied live under its short-name 0004;
 -- the renumber is repo ordering only, not a re-apply.
 --
--- Reverses the per-user scaffolding added in 0006. The project owner has
+-- Reverses the per-user scaffolding added in 0007. The project owner has
 -- chosen a SHARED-ACCESS model over per-row isolation for the character
 -- family: login exists only to view; the AI GM writes as `service_role`
 -- (which bypasses RLS); and general read/write for any logged-in user is
 -- desired. The data is not sensitive, so per-character ownership is not wanted.
 --
--- This migration therefore drops everything 0006 added to enforce ownership:
+-- This migration therefore drops everything 0007 added to enforce ownership:
 --   * the 20 per-user `_own` RLS policies (4 verbs x 5 tables),
 --   * rpg.claim_demo_party() (its EXECUTE grant drops with the function),
 --   * the characters_owner_id_idx index,
 --   * the rpg.characters.owner_id column.
 --
 -- KEPT (deliberately not touched):
---   * The two grants from 0006 —
+--   * The two grants from 0007 —
 --       grant usage on schema rpg to authenticated;
 --       grant select, insert, update, delete on all tables in schema rpg
 --         to authenticated;
@@ -37,17 +37,17 @@
 -- origin/main revealed their source: main's 0004_rpg_api_access.sql created
 -- them as a DELIBERATE open-anon posture. They are left in place here because
 -- they deliver the shared-authenticated access the owner then wanted; a
--- subsequent migration (0008) narrows them to `authenticated` only.
+-- subsequent migration (0009) narrows them to `authenticated` only.
 --
 -- Net effect: the schema honestly reflects "shared authenticated access, no
 -- per-row ownership." Forward-only: this reversal lands as a new migration,
--- never as an edit to 0006.
+-- never as an edit to 0007.
 -- ============================================================================
 
 begin;
 
 -- ---------------------------------------------------------------------------
--- 1. Drop the 20 per-user `_own` policies from 0006.
+-- 1. Drop the 20 per-user `_own` policies from 0007.
 --    (Must precede dropping owner_id: the characters policies reference it.)
 -- ---------------------------------------------------------------------------
 
