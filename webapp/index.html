@@ -379,7 +379,13 @@ button { font-family: inherit; cursor: pointer; }
         <h2 id="shName">Vesper Quill</h2>
         <p id="shTag">"I made a bargain with something that laughs in the dark. It's been very generous."</p>
       </div>
-      <div class="grid sheet">
+      <div id="emptyVault" style="display:none">
+        <div class="card" style="text-align:center;padding:52px 24px">
+          <div style="font-family:var(--serif);font-size:1.35rem;margin-bottom:10px">The vault stands empty</div>
+          <p style="color:var(--ink-dim);max-width:54ch;margin:0 auto">No characters here yet — nothing is seeded. When your GM rolls up the party at the table, or you add one, it appears here live. This vault is yours to fill.</p>
+        </div>
+      </div>
+      <div class="grid sheet" id="sheetGrid">
         <div class="grid" style="gap:16px;">
           <div class="card vitals">
             <div class="card-t">Vitals <span class="rule"></span></div>
@@ -694,7 +700,20 @@ function renderSwitcher() {
     b.onclick = () => { current = PARTY.find(p => p.id === b.dataset.id); renderSheet(); renderSwitcher(); });
 }
 
+function renderEmptySheet() {
+  $("#sheetGrid").style.display = "none";
+  $("#emptyVault").style.display = "";
+  $("#tbCrest").textContent = "·";
+  $("#tbName").textContent = "—";
+  $("#tbSub").textContent = "no characters yet";
+  $("#shName").textContent = "An empty vault";
+  $("#shTag").textContent = "Your party will appear here once it exists.";
+}
+
 function renderSheet() {
+  if (!current) { renderEmptySheet(); return; }
+  $("#sheetGrid").style.display = "";
+  $("#emptyVault").style.display = "none";
   const c = current, pb = profBonus(c.level);
   $("#tbCrest").textContent = c.initial;
   $("#tbName").textContent = c.name;
@@ -890,15 +909,11 @@ async function enterLive(email){
   demoMode = false;
   try {
     const party = await loadParty();
-    if(!party.length){
-      PARTY = cloneMock();
-      toast("The vault is empty — showing the demo party");
-    } else {
-      PARTY = party;
-    }
-    current = PARTY[0];
+    PARTY = party;                          // live vault only — no demo fallback here
+    current = party.length ? party[0] : null;
     setLiveBadges(email);
     renderAll(); showApp();
+    if(!party.length) toast("Signed in — your vault is empty, ready for a real party");
   } catch (e) {
     const msg = (e && (e.message || e.hint || e.details)) || String(e);
     // The most common first-run cause: the rpg schema isn't exposed to the API.
