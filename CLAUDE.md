@@ -20,7 +20,8 @@ adventures/   ← adventures/dnd5e/<kebab-title>/ — hook, scenes, NPCs, loot, 
                 a World: line in the hook names the adventure's world
 characters/   ← characters/dnd5e/ — player characters and recurring NPCs
 sessions/     ← sessions/dnd5e/ — session recaps (<yyyy-mm-dd>-<adventure-slug>.md)
-prompts/      ← the GM prompts, flat, one per system: gm-dnd5e.md (gm-vtm.md later)
+prompts/      ← flat, tag in filename, three per system: gm-<tag>.md (the GM prompt)
+                + first-evening-<tag>.md / every-evening-<tag>.md (owner paste-in cards)
 docs/         ← how this repo itself works (binder map, prompt-authoring, decisions)
 ```
 
