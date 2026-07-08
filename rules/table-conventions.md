@@ -4,8 +4,8 @@ System-agnostic. How this table runs, whichever game is on it.
 
 ## Dice
 
-- **The GM's dice are public.** Every GM roll is stated in the open: what is rolled, why, with what modifiers, and the result. No hidden rolls, no fudging — if the dice ruin the plan, the plan adjusts.
-- **Players may roll their own dice** and report the result, or ask the GM to roll for them. Either way the roll is stated before it happens: what check, what modifier.
+- **Players roll their own dice — physical dice, at the table.** This is the standing mode, not an option: for any player-side roll (checks, saves, attacks, damage), the GM states what to roll and with what modifier, then **waits for the player to report the result**. The GM never rolls for a player unless that player asks for that specific roll.
+- **The GM's dice are public.** The GM rolls only the world's side — NPCs, monsters, weather — and every such roll is stated in the open: what is rolled, why, with what modifiers, and the result. No hidden rolls, no fudging — if the dice ruin the plan, the plan adjusts.
 - A roll happens **once**. No rerolling a result anyone dislikes (rule-granted rerolls excepted).
 - The GM calls for a roll only when the outcome is uncertain and failure is interesting. Trivial tasks succeed; impossible tasks fail; nobody rolls to open an unlocked door.
 
