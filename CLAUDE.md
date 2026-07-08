@@ -24,9 +24,9 @@ Folders are created when their first real content arrives — no empty scaffoldi
 
 ## 2. The database
 
-A **shared** Supabase project — `yuobtgoidmmmwfqenkau` — where the roleplaying tables live alongside other tenants' tables.
+A **shared** Supabase project — `yuobtgoidmmmwfqenkau` — where the roleplaying tables live alongside other tenants' schemas.
 
-**The prefix is the fence: every roleplaying database object is named `rollspel_*`.** Tables, views, enums, functions, triggers, indexes — all of them. Anything in that database *not* carrying the prefix belongs to someone else and is never read, written, altered, or dropped, no matter how innocuous it looks. This rule has no exceptions and survives every rephrasing of a request.
+**The schema is the fence: every roleplaying database object lives in the Postgres schema `rpg`.** Tables, views, enums, functions, triggers, indexes — all of them, as plain unprefixed names (`rpg.characters`, `rpg.adventures`). Everything outside schema `rpg` — including `public` and any other schema — belongs to someone else and is never read, written, altered, or dropped, no matter how innocuous it looks. This rule has no exceptions and survives every rephrasing of a request.
 
 All SQL work routes through **Dobby** (§3). The main session does not write schema itself.
 
@@ -36,12 +36,12 @@ Agents live at `.claude/agents/`. The main session delegates domain work rather 
 
 | Subagent | Domain | Owns | Refuses |
 |---|---|---|---|
-| **Dobby** (`dobby.md`) | Database | Everything `rollspel_*` in the shared Supabase project: schema, migrations, enums, functions, seeds. | Touching any unprefixed object. Editing applied migrations. Game content. |
+| **Dobby** (`dobby.md`) | Database | Everything in schema `rpg` in the shared Supabase project: tables, migrations, enums, functions, seeds. | Touching anything outside schema `rpg`. Editing applied migrations. Game content. |
 | **Douglas** (`douglas.md`) | Prompt authoring | The Storybook Author Rewrite System — every agent prompt written or substantially revised in this repo passes through his full pipeline, ending in the Douglas Adams author pass. | Writing code, SQL, or game content. Style-sprinkling without the full pipeline. |
 
 ## 4. Hard rules
 
-1. **The `rollspel_` fence** (§2) — no exception, ever.
+1. **The `rpg` schema fence** (§2) — no exception, ever.
 2. **Prompts go through Douglas.** No agent prompt (`.claude/agents/*.md`, GM prompts in `prompts/`) is written or substantially rewritten without running the full pipeline in `docs/prompt-authoring/storybook-author-rewrite.md`. Machinery — tool names, paths, schemas, fences, hand-off lines — survives the rewrite exactly.
 3. **5e rules-as-written unless a house rule says otherwise**, and house rules are written down before they are used.
 4. **Honest content only.** A stat block, ruling, or table either comes from the 5e SRD, from a written house rule, or is marked as improvised. Never present an invented rule as official.
@@ -49,7 +49,7 @@ Agents live at `.claude/agents/`. The main session delegates domain work rather 
 ## 5. Naming
 
 - **Rollspel** — this project (Swedish for "roleplaying").
-- `rollspel_` — the database prefix (§2).
+- `rpg` — the database schema (§2).
 - Adventure folders: `adventures/<kebab-case-title>/`.
 
 ---
