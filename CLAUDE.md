@@ -14,7 +14,10 @@
 ```text
 rules/        ← shelf root: system-agnostic (safety-tools, table-conventions);
                 rules/dnd5e/ etc. for system-specific (house rules, SRD quick-refs)
-adventures/   ← adventures/dnd5e/<kebab-title>/ — hook, scenes, NPCs, loot, secrets
+worlds/       ← persistent settings, flat, one per system: worlds/dnd5e.md
+                (a system with several worlds graduates to worlds/<tag>/ — map first)
+adventures/   ← adventures/dnd5e/<kebab-title>/ — hook, scenes, NPCs, loot, secrets;
+                a World: line in the hook names the adventure's world
 characters/   ← characters/dnd5e/ — player characters and recurring NPCs
 sessions/     ← sessions/dnd5e/ — session recaps (<yyyy-mm-dd>-<adventure-slug>.md)
 prompts/      ← the GM prompts, flat, one per system: gm-dnd5e.md (gm-vtm.md later)
