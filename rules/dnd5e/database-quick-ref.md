@@ -1,10 +1,11 @@
 # Database quick-ref (D&D 5e)
 
 > **What this doc is:** the table-side reference to the character vault's SQL
-> surface — the two read views and seventeen write verbs in schema `rpg` of
+> surface — the read views and write verbs in schema `rpg` of
 > Supabase project `yuobtgoidmmmwfqenkau`. Read it whole at session start.
-> **Source of truth:** migration `db/migrations/0003_adventures_and_gm_surface.sql`
-> and its function comments. This doc summarizes; the migration decides.
+> **Source of truth:** migrations `db/migrations/0003_adventures_and_gm_surface.sql`
+> and `db/migrations/0005_story_beats.sql`, and their function comments.
+> This doc summarizes; the migrations decide.
 
 ---
 
@@ -116,6 +117,24 @@ five character tables and returns the finished sheet, derived numbers included.
 ```
 
 Character names must be unique — the write verbs resolve by name.
+
+### The live story stream — public, append-only
+
+`rpg.story_beats` is the **public** live stream: every row appears on every
+player's browser (Supabase Realtime) the moment it commits, and no beat can be
+edited or deleted once written. **Never put a GM secret through it** — secrets,
+rulings-in-progress, and threads go to your private log via `rpg.log_event`
+(`rpg.session_events`, invisible to players). Opposite audiences; never mix.
+Source of truth: `db/migrations/0005_story_beats.sql`.
+
+- `rpg.narrate('<adventure-slug>', 'content', kind, speaker)` — append one
+  beat. `kind` defaults to `narration`, `speaker` to `GM`. Kinds:
+  `narration` (GM prose) · `dialogue` (attributed speech — set `speaker`) ·
+  `roll` (dice results) · `mechanics` (damage, rests, slots) · `system`
+  (session start/pause/end notices).
+- `rpg.story_so_far('<adventure-slug>', limit)` — the recent beats in
+  chronological order (default 50). Call it at session start: if a stream
+  already exists, you are resuming that story, not starting a new one.
 
 ---
 
