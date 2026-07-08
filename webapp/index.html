@@ -261,6 +261,15 @@ button { font-family: inherit; cursor: pointer; }
 .combatant .hpn button { border: 1px solid var(--line); background: var(--panel); color: var(--ink-dim); width: 24px; height: 24px; border-radius: 7px; font-weight: 700; margin-left: 4px; }
 .combatant .hpn button:hover { color: var(--gold); border-color: var(--violet-dim); }
 
+/* live board extras */
+.health { font-family: var(--mono); font-size: .62rem; letter-spacing: .1em; text-transform: uppercase; padding: 3px 10px; border-radius: 20px; border: 1px solid var(--line); }
+.health.fresh    { color: var(--moss);  border-color: color-mix(in srgb, var(--moss) 45%, var(--line)); }
+.health.wounded  { color: var(--gold);  border-color: color-mix(in srgb, var(--gold) 45%, var(--line)); }
+.health.bloodied { color: var(--blood); border-color: color-mix(in srgb, var(--blood) 55%, var(--line)); }
+.health.down     { color: var(--ink-faint); }
+.cond { font-family: var(--mono); font-size: .56rem; letter-spacing: .08em; text-transform: uppercase; padding: 2px 7px; border-radius: 20px; background: var(--bg); border: 1px solid var(--violet-dim); color: var(--violet); }
+.combatant.up-now { border-color: var(--gold); box-shadow: var(--glow); transform: translateX(4px); background: var(--panel); }
+
 .notes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
 .note { background: linear-gradient(180deg, var(--panel), var(--panel-2)); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; position: relative; box-shadow: var(--shadow); border-top: 3px solid var(--violet); }
 .note.pin { border-top-color: var(--gold); }
@@ -270,6 +279,9 @@ button { font-family: inherit; cursor: pointer; }
 .note .del { position: absolute; top: 10px; right: 10px; background: none; border: none; color: var(--ink-faint); font-size: 1rem; opacity: 0; transition: opacity .15s; }
 .note:hover .del { opacity: 1; }
 .note .del:hover { color: var(--blood); }
+.note .pinb { position: absolute; top: 10px; right: 36px; background: none; border: none; color: var(--ink-faint); font-size: 1rem; opacity: 0; transition: opacity .15s; }
+.note:hover .pinb { opacity: 1; }
+.note .pinb:hover { color: var(--gold); }
 .note-new textarea, .note-new input { width: 100%; background: var(--bg-2); border: 1px solid var(--line); color: var(--ink); border-radius: 9px; padding: 9px 11px; font-family: var(--sans); resize: vertical; }
 .note-new input { margin-bottom: 8px; font-family: var(--serif); font-weight: 600; }
 .note-new { display: flex; flex-direction: column; border-style: dashed; }
@@ -522,12 +534,29 @@ button { font-family: inherit; cursor: pointer; }
     <!-- ===== ENCOUNTERS ===== -->
     <section class="view" id="view-enc">
       <div class="view-head">
-        <span class="eyebrow">Initiative · the bell tower</span>
-        <h2>The Bell‑Ringer's Wake</h2>
-        <p>Barnacled dead climb the tower stair. Roll for initiative — the bell tolls in three rounds.</p>
-        <span class="local-note">◈ local tracker — encounters aren't in the schema yet</span>
+        <span class="eyebrow" id="encEyebrow">Initiative · the bell tower</span>
+        <h2 id="encTitle">The Bell‑Ringer's Wake</h2>
+        <p id="encDesc">Barnacled dead climb the tower stair. Roll for initiative — the bell tolls in three rounds.</p>
+        <span class="local-note" id="encLocalNote">◈ offline preview — sign in for the live board</span>
       </div>
-      <div class="card">
+
+      <!-- live combat board (read-only; the GM runs the fight) -->
+      <div id="encLive" style="display:none">
+        <div class="card">
+          <div class="enc-head">
+            <div class="round"><span id="encRoundNo">Round —</span><small id="encStatus">no fight on the board</small></div>
+            <div class="grow" style="flex:1"></div>
+            <span class="pill live" id="encLivePill" style="display:none">streaming</span>
+            <button class="btn" id="encRefresh">↻ Refresh</button>
+          </div>
+          <div id="board"></div>
+          <p style="color:var(--ink-faint);font-size:.76rem;font-family:var(--mono);margin:12px 0 0">
+            The GM runs the fight from the vault — this board is your window. Party HP shows numbers; foes show only how they look.</p>
+        </div>
+      </div>
+
+      <!-- offline demo tracker -->
+      <div class="card" id="encDemo">
         <div class="enc-head">
           <div class="round">Round <span id="roundNo">2</span><small>the drowned close in</small></div>
           <div class="grow" style="flex:1"></div>
@@ -544,7 +573,7 @@ button { font-family: inherit; cursor: pointer; }
         <span class="eyebrow">Field notes · yours alone</span>
         <h2>The Margins</h2>
         <p>Scribbles the GM never sees. Suspicions, debts, and things you swore you'd remember.</p>
-        <span class="local-note">◈ kept on this device — a notes table is a good next migration</span>
+        <span class="local-note" id="notesLocalNote">◈ offline preview — sign in and your notes live in the vault, visible only to you</span>
       </div>
       <div class="notes-grid" id="notes"></div>
     </section>
@@ -577,7 +606,7 @@ const SUPA_URL = "https://yuobtgoidmmmwfqenkau.supabase.co";
 const SUPA_KEY = "sb_publishable_5mM_XYUA-fj17dFmrErsHA_uznvRXGY";
 const RPG = "rpg";                       // our schema fence
 
-let sb = null, LIVE = false, demoMode = false, authMode = "signin";
+let sb = null, LIVE = false, demoMode = false, authMode = "signin", USER_ID = null;
 try {
   if (window.supabase && SUPA_URL && SUPA_KEY) {
     sb = window.supabase.createClient(SUPA_URL, SUPA_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
@@ -925,8 +954,9 @@ function advStartPoll() {
   advStopPoll();
   if (!(LIVE && !demoMode) || !ADV.id) return;
   ADV.timer = setInterval(() => {
-    if (document.visibilityState === "visible" && $("#view-story").classList.contains("on"))
-      loadAdventureContent().catch(() => {});
+    if (document.visibilityState !== "visible") return;
+    if ($("#view-story").classList.contains("on")) loadAdventureContent().catch(() => {});
+    else if ($("#view-enc").classList.contains("on")) loadBoard().catch(() => {});
   }, 12000);
   $("#advLivePill").style.display = "";
 }
@@ -939,13 +969,74 @@ $("#advPick").onchange = () => {
   localStorage.setItem("codex-adventure", ADV.id || "");
   renderStory();
   loadAdventureContent().catch(e => toast("Couldn't open the story: " + (e.message || e), true));
+  loadBoard().catch(() => {});
   advStartPoll();
 };
 $("#advRefresh").onclick = () =>
   loadAdventures().then(advPickRender).then(loadAdventureContent).then(renderStory)
     .catch(e => toast("Couldn't refresh the ledger: " + (e.message || e), true));
 
+/* ===================== LIVE COMBAT BOARD (rpg.encounter_board) ===================== */
+const ENC = { rows: [] };
+async function loadBoard() {
+  const a = ADV.list.find(x => x.id === ADV.id);
+  if (!a) { ENC.rows = []; renderEnc(); return; }
+  const { data, error } = await sb.schema(RPG).from("encounter_board")
+    .select("*").eq("adventure_slug", a.slug).order("turn_order", { ascending: true });
+  if (error) throw error;
+  ENC.rows = data || [];
+  renderEnc();
+}
+function renderLiveBoard() {
+  const a = ADV.list.find(x => x.id === ADV.id);
+  const rows = ENC.rows;
+  $("#encEyebrow").textContent = a ? `rpg.encounter_board · ${a.slug}` : "rpg.encounter_board";
+  if (!a) {
+    $("#encTitle").textContent = "The combat board";
+    $("#encDesc").textContent = "Choose an adventure on the Story page — its fights appear here.";
+  } else if (!rows.length) {
+    $("#encTitle").textContent = "The combat board";
+    $("#encDesc").textContent = `No fight on the board for ${a.title} — the world is briefly at peace.`;
+  } else {
+    $("#encTitle").textContent = rows[0].encounter;
+    $("#encDesc").textContent = rows[0].status === "building"
+      ? "The GM is assembling the board — initiative pending."
+      : "Initiative order, live from the vault.";
+  }
+  $("#encRoundNo").textContent = rows.length ? `Round ${rows[0].round}` : "Round —";
+  $("#encStatus").textContent = rows.length ? rows[0].status : "no fight on the board";
+  $("#encLivePill").style.display = rows.length ? "" : "none";
+  $("#board").innerHTML = rows.length ? rows.map(r => {
+    const friendly = r.side === "party" || r.side === "ally";
+    // foe-HP secrecy (0013's design): the party sees numbers, foes show only the label
+    const hp = friendly
+      ? `${r.hp_current} / ${r.hp_max}`
+      : `<span class="health ${esc(r.health)}">${esc(r.health)}</span>`;
+    const bar = friendly && r.hp_max
+      ? `<div class="cbar"><i style="width:${Math.max(0, r.hp_current / r.hp_max * 100)}%"></i></div>` : "";
+    const conds = (r.conditions || []).map(c => `<span class="cond">${esc(c)}</span>`).join(" ");
+    const sub = [r.side, friendly ? `AC ${r.armor_class}` : null, r.notes || null].filter(Boolean).join(" · ");
+    return `<div class="combatant ${r.side === "foe" ? "foe" : ""} ${r.is_up ? "up-now" : ""} ${r.health === "down" ? "downed" : ""}">
+      <div class="init">${r.initiative ?? "—"}</div>
+      <div><div class="cnm">${esc(r.name)} ${conds}<small>${esc(sub)}</small></div>${bar}</div>
+      <div class="hpn">${hp}</div>
+    </div>`;
+  }).join("") : `<p style="color:var(--ink-faint);font-size:.9rem;font-family:var(--serif);font-style:italic;margin:6px 0">Blades sheathed, spells unspent. When the GM opens a fight, it lands here.</p>`;
+}
+$("#encRefresh").onclick = () => loadBoard().catch(e => toast("Couldn't read the board: " + (e.message || e), true));
+
 function renderEnc() {
+  const live = LIVE && !demoMode;
+  $("#encLive").style.display = live ? "" : "none";
+  $("#encDemo").style.display = live ? "none" : "";
+  $("#encLocalNote").style.display = live ? "none" : "";
+  if (live) {
+    renderLiveBoard();
+  } else {
+    $("#encEyebrow").textContent = "Initiative · the bell tower";
+    $("#encTitle").textContent = "The Bell‑Ringer's Wake";
+    $("#encDesc").textContent = "Barnacled dead climb the tower stair. Roll for initiative — the bell tolls in three rounds.";
+  }
   $("#roundNo").textContent = COMBAT.round;
   $("#combatants").innerHTML = COMBAT.list.map((c,i)=>{
     const downed = c.hp<=0;
@@ -961,17 +1052,47 @@ function renderEnc() {
 $("#nextTurn").onclick = () => { COMBAT.turn++; if(COMBAT.turn>=COMBAT.list.length){ COMBAT.turn=0; COMBAT.round++; } renderEnc(); };
 $("#prevTurn").onclick = () => { COMBAT.turn--; if(COMBAT.turn<0){ COMBAT.turn=COMBAT.list.length-1; COMBAT.round=Math.max(1,COMBAT.round-1); } renderEnc(); };
 
+/* ===================== NOTES (live: rpg.player_notes, yours alone) ===================== */
+let PNOTES = [];
+async function loadNotes() {
+  const { data, error } = await sb.schema(RPG).from("player_notes")
+    .select("*").order("pinned", { ascending: false }).order("created_at", { ascending: false });
+  if (error) throw error;
+  PNOTES = data || [];
+  renderNotes();
+}
 function renderNotes() {
+  const live = LIVE && !demoMode;
+  $("#notesLocalNote").style.display = live ? "none" : "";
+  const items = live
+    ? PNOTES.map(n => ({ id: n.id, t: n.title, b: n.body, pin: n.pinned,
+        when: n.created_at ? new Date(n.created_at).toLocaleDateString() : "" }))
+    : NOTES.map((n, i) => ({ id: String(i), ...n }));
   const host = $("#notes");
-  host.innerHTML = NOTES.map((n,i)=>
-    `<div class="note ${n.pin?'pin':''}"><button class="del" data-i="${i}" aria-label="Delete">✕</button><h4>${n.pin?'★ ':''}${n.t}</h4><p>${n.b}</p><div class="meta"><span>${n.when}</span><span>${n.pin?'pinned':'note'}</span></div></div>`).join("")
+  host.innerHTML = items.map(n =>
+    `<div class="note ${n.pin?'pin':''}"><button class="pinb" data-id="${n.id}" aria-label="Pin" title="${n.pin?'Unpin':'Pin'}">★</button><button class="del" data-id="${n.id}" aria-label="Delete">✕</button><h4>${n.pin?'★ ':''}${esc(n.t)}</h4><p>${esc(n.b)}</p><div class="meta"><span>${esc(n.when)}</span><span>${n.pin?'pinned':'note'}</span></div></div>`).join("")
     + `<div class="note note-new"><input id="noteTitle" placeholder="A title you'll recognise" /><textarea id="noteBody" rows="3" placeholder="What must not be forgotten…"></textarea><div class="row"><button class="btn btn-gold" style="margin:0;padding:9px" id="addNote">Pin it to the margin</button></div></div>`;
-  host.querySelectorAll(".del").forEach(b=>b.onclick=()=>{ NOTES.splice(+b.dataset.i,1); renderNotes(); });
-  $("#addNote").onclick=()=>{
-    const t=$("#noteTitle").value.trim(), b=$("#noteBody").value.trim();
-    if(!t && !b) return;
-    NOTES.unshift({t:t||"Untitled", b:b, pin:false, when:"just now"});
-    renderNotes();
+
+  const fail = e => toast("The margin wouldn't take the ink: " + (e.message || e), true);
+  host.querySelectorAll(".del").forEach(b => b.onclick = () => {
+    if (live) sb.schema(RPG).from("player_notes").delete().eq("id", b.dataset.id)
+      .then(({error}) => { if (error) throw error; return loadNotes(); }).catch(fail);
+    else { NOTES.splice(+b.dataset.id, 1); renderNotes(); }
+  });
+  host.querySelectorAll(".pinb").forEach(b => b.onclick = () => {
+    if (live) {
+      const n = PNOTES.find(x => x.id === b.dataset.id); if (!n) return;
+      sb.schema(RPG).from("player_notes").update({ pinned: !n.pinned }).eq("id", n.id)
+        .then(({error}) => { if (error) throw error; return loadNotes(); }).catch(fail);
+    } else { const n = NOTES[+b.dataset.id]; n.pin = !n.pin; renderNotes(); }
+  });
+  $("#addNote").onclick = () => {
+    const t = $("#noteTitle").value.trim(), b = $("#noteBody").value.trim();
+    if (!t && !b) return;
+    if (live) sb.schema(RPG).from("player_notes")
+      .insert({ owner_id: USER_ID, title: t, body: b, adventure_id: ADV.id || null })
+      .then(({error}) => { if (error) throw error; toast("Pinned to your margin"); return loadNotes(); }).catch(fail);
+    else { NOTES.unshift({ t: t || "Untitled", b: b, pin: false, when: "just now" }); renderNotes(); }
   };
 }
 
@@ -997,6 +1118,12 @@ document.querySelectorAll(".navbtn[data-view]").forEach(b=>b.onclick=()=>{
   b.classList.add("active");
   document.querySelectorAll(".view").forEach(v=>v.classList.remove("on"));
   $("#view-"+b.dataset.view).classList.add("on");
+  // entering a live tab refreshes it immediately (the poll keeps it fresh after)
+  if (LIVE && !demoMode) {
+    if (b.dataset.view === "enc") loadBoard().catch(() => {});
+    else if (b.dataset.view === "story" && ADV.id) loadAdventureContent().catch(() => {});
+    else if (b.dataset.view === "notes") loadNotes().catch(() => {});
+  }
 });
 
 /* ===================== THEME ===================== */
@@ -1051,6 +1178,8 @@ function setLiveBadges(email){
 async function enterLive(email){
   demoMode = false;
   try {
+    const { data: sess } = await sb.auth.getSession();
+    USER_ID = sess && sess.session ? sess.session.user.id : null;
     const party = await loadParty();
     PARTY = party;                          // live vault only — no demo fallback here
     current = party.length ? party[0] : null;
@@ -1058,7 +1187,8 @@ async function enterLive(email){
     setLiveBadges(email);
     advPickRender();
     renderAll(); showApp();
-    if (ADV.id) { loadAdventureContent().catch(()=>{}); advStartPoll(); }
+    loadNotes().catch(()=>{});
+    if (ADV.id) { loadAdventureContent().catch(()=>{}); loadBoard().catch(()=>{}); advStartPoll(); }
     if(!party.length) toast("Signed in — your vault is empty, ready for a real party");
   } catch (e) {
     const msg = (e && (e.message || e.hint || e.details)) || String(e);
