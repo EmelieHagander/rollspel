@@ -234,6 +234,20 @@ button { font-family: inherit; cursor: pointer; }
 .tag.att { color: var(--shroud); border-color: color-mix(in srgb, var(--shroud) 45%, var(--line)); }
 .qty { font-family: var(--mono); color: var(--ink-faint); font-size: .8rem; }
 
+/* grimoire accordion */
+.spell-row .li { cursor: pointer; }
+.spell-row .li:hover .nm { color: var(--gold-soft); }
+.spell-row .chev { color: var(--ink-faint); font-size: 1.05rem; line-height: 1; transition: transform .18s; flex: none; }
+.spell-row.open .chev { transform: rotate(90deg); color: var(--gold); }
+.spell-detail { display: none; padding: 2px 8px 13px 38px; border-bottom: 1px solid var(--line-soft); }
+.spell-row:last-child .spell-detail { border-bottom: none; }
+.spell-row.open .spell-detail { display: block; animation: fade .25s ease; }
+.spell-row.open .li { border-bottom: none; }
+.spell-stats { font-family: var(--mono); font-size: .64rem; letter-spacing: .06em; text-transform: uppercase; color: var(--violet); margin-bottom: 6px; }
+.spell-detail p { margin: 0; font-size: .85rem; color: var(--ink-dim); max-width: 60ch; }
+.spell-detail .tnote { margin-top: 7px; font-family: var(--serif); font-style: italic; }
+.src { font-family: var(--mono); font-size: .54rem; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); border: 1px solid var(--line); border-radius: 20px; padding: 1px 7px; margin-left: 8px; white-space: nowrap; vertical-align: 1px; }
+
 .coins { display: flex; gap: 8px; flex-wrap: wrap; }
 .coin { display: flex; align-items: center; gap: 7px; background: var(--bg-2); border: 1px solid var(--line-soft); border-radius: 20px; padding: 5px 11px 5px 6px; }
 .coin .disc { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-family: var(--mono); font-size: .56rem; font-weight: 700; color: #201607; }
@@ -652,6 +666,42 @@ const SKILL_ABIL = {
   stealth:"dexterity", survival:"wisdom"
 };
 const titleCase = s => s.replace(/_/g," ").replace(/\b\w/g, c => c.toUpperCase());
+
+/* ===================== SRD POCKET-REFERENCE =====================
+   Compact summaries of 5e SRD 5.1 spells (paraphrased, numbers as written).
+   Honesty rule: entries here render with an "SRD summary" badge; a spell not
+   in this list says so plainly instead of inventing rules text. */
+const SPELLBOOK = {
+  "druidcraft":      { s:"transmutation cantrip", cast:"1 action", range:"30 ft", comp:"V,S", dur:"instant", text:"Whisper to the spirits of nature: predict the next day's weather, make a flower bloom or a seed pod open, create a tiny harmless sensory effect, or light/snuff a candle-sized flame." },
+  "guidance":        { s:"divination cantrip", cast:"1 action", range:"touch", comp:"V,S", dur:"conc. up to 1 min", text:"Touch a willing creature. Once before the spell ends, it can add 1d4 to one ability check of its choice (before or after rolling)." },
+  "produce flame":   { s:"conjuration cantrip", cast:"1 action", range:"self", comp:"V,S", dur:"10 min", text:"A flickering flame in your palm: bright light 10 ft, dim 10 ft more. Hurl it (range 30 ft) as a ranged spell attack for 1d8 fire damage — 2d8 at 5th level." },
+  "sacred flame":    { s:"evocation cantrip", cast:"1 action", range:"60 ft", comp:"V,S", dur:"instant", text:"Flame-like radiance descends on a creature: DEX save or take 1d8 radiant damage. The target gains no benefit from cover against this save." },
+  "light":           { s:"evocation cantrip", cast:"1 action", range:"touch", comp:"V,M", dur:"1 hour", text:"An object no larger than 10 ft glows: bright light in a 20-ft radius, dim for 20 more. A hostile carrier gets a DEX save to dodge the touch." },
+  "minor illusion":  { s:"illusion cantrip", cast:"1 action", range:"30 ft", comp:"S,M", dur:"1 min", text:"Create a sound or a stationary image no larger than a 5-ft cube. Physical interaction reveals it; an Investigation check against your spell DC sees through it." },
+  "prestidigitation":{ s:"transmutation cantrip", cast:"1 action", range:"10 ft", comp:"V,S", dur:"up to 1 hour", text:"A minor magical trick: spark or snuff a small flame, clean or soil an object, chill/warm/flavor food, make a small mark or trinket appear." },
+  "eldritch blast":  { s:"evocation cantrip", cast:"1 action", range:"120 ft", comp:"V,S", dur:"instant", text:"A crackling beam of energy: ranged spell attack, 1d10 force damage. A second beam at 5th level (more at 11th/17th) — aim them together or apart." },
+  "bless":           { s:"1st · enchantment", cast:"1 action", range:"30 ft", comp:"V,S,M", dur:"conc. up to 1 min", text:"Up to three creatures add 1d4 to every attack roll and saving throw they make while blessed." },
+  "cure wounds":     { s:"1st · evocation", cast:"1 action", range:"touch", comp:"V,S", dur:"instant", text:"A touched creature regains 1d8 + your spellcasting modifier hit points. No effect on undead or constructs. +1d8 per slot level above 1st." },
+  "protection from evil and good": { s:"1st · abjuration", cast:"1 action", range:"touch", comp:"V,S,M", dur:"conc. up to 10 min", text:"Against aberrations, celestials, elementals, fey, fiends and undead: they attack the warded creature with disadvantage, and it can't be charmed, frightened or possessed by them." },
+  "sanctuary":       { s:"1st · abjuration", cast:"1 bonus action", range:"30 ft", comp:"V,S,M", dur:"1 min", text:"Anyone targeting the warded creature must first make a WIS save or choose a new target. The ward ends if the creature attacks or casts a spell at an enemy." },
+  "shield of faith": { s:"1st · abjuration", cast:"1 bonus action", range:"60 ft", comp:"V,S,M", dur:"conc. up to 10 min", text:"A shimmering field grants one creature +2 AC for the duration." },
+  "entangle":        { s:"1st · conjuration", cast:"1 action", range:"90 ft", comp:"V,S", dur:"conc. up to 1 min", text:"Grasping weeds fill a 20-ft square of ground: STR save or be restrained; escaping takes an action and a STR check against your DC. The area is difficult terrain." },
+  "faerie fire":     { s:"1st · evocation", cast:"1 action", range:"60 ft", comp:"V", dur:"conc. up to 1 min", text:"Objects and creatures in a 20-ft cube: DEX save or glow with colored light — attacks against them have advantage, and invisibility stops helping." },
+  "healing word":    { s:"1st · evocation", cast:"1 bonus action", range:"60 ft", comp:"V", dur:"instant", text:"A word of power heals 1d4 + your spellcasting modifier at range. No effect on undead or constructs. +1d4 per slot level above 1st." },
+  "hex":             { s:"1st · enchantment", cast:"1 bonus action", range:"90 ft", comp:"V,S,M", dur:"conc. up to 1 hour", text:"Curse a creature: your attacks against it deal +1d6 necrotic, and it has disadvantage on checks with one ability you choose. If it drops to 0 HP, move the hex to a new target with a bonus action." },
+  "charm person":    { s:"1st · enchantment", cast:"1 action", range:"30 ft", comp:"V,S", dur:"1 hour", text:"A humanoid makes a WIS save (with advantage if you or your companions are fighting it) or regards you as a friendly acquaintance. It knows it was charmed when the spell ends." },
+  "guiding bolt":    { s:"1st · evocation", cast:"1 action", range:"120 ft", comp:"V,S", dur:"1 round", text:"A flash of light: ranged spell attack for 4d6 radiant damage, and the next attack roll against the target before the end of your next turn has advantage." },
+  "darkness":        { s:"2nd · evocation", cast:"1 action", range:"60 ft", comp:"V,M", dur:"conc. up to 10 min", text:"Magical darkness fills a 15-ft radius sphere. Darkvision can't see through it and nonmagical light can't illuminate it." },
+  "lesser restoration": { s:"2nd · abjuration", cast:"1 action", range:"touch", comp:"V,S", dur:"instant", text:"End one disease or one condition afflicting a touched creature: blinded, deafened, paralyzed or poisoned." },
+  "melf's acid arrow": { s:"2nd · evocation", cast:"1 action", range:"90 ft", comp:"V,S,M", dur:"instant", text:"A shimmering arrow: ranged spell attack for 4d4 acid damage now and 2d4 acid at the end of the target's next turn. On a miss: half the initial damage, none later." },
+  "moonbeam":        { s:"2nd · evocation", cast:"1 action", range:"120 ft", comp:"V,S,M", dur:"conc. up to 1 min", text:"A 5-ft-radius beam of pale light: a creature entering it or starting its turn there makes a CON save — 2d10 radiant, half on a save; shapechangers save at disadvantage. Move the beam 60 ft as an action." },
+  "misty step":      { s:"2nd · conjuration", cast:"1 bonus action", range:"self", comp:"V", dur:"instant", text:"Briefly surrounded by silvery mist, you teleport up to 30 ft to an unoccupied space you can see." },
+  "scorching ray":   { s:"2nd · evocation", cast:"1 action", range:"120 ft", comp:"V,S", dur:"instant", text:"Three rays of fire, each a separate ranged spell attack for 2d6 fire damage, at one target or several. +1 ray per slot level above 2nd." },
+  "fly":             { s:"3rd · transmutation", cast:"1 action", range:"touch", comp:"V,S,M", dur:"conc. up to 10 min", text:"A touched willing creature gains a flying speed of 60 ft for the duration. If the spell ends aloft, it falls." },
+  "daylight":        { s:"3rd · evocation", cast:"1 action", range:"60 ft", comp:"V,S", dur:"1 hour", text:"A 60-ft radius of bright light (plus 60 dim). If the area overlaps magical darkness of 3rd level or lower, that darkness is dispelled." },
+  "spirit guardians":{ s:"3rd · conjuration", cast:"1 action", range:"self (15-ft radius)", comp:"V,S,M", dur:"conc. up to 10 min", text:"Protective spirits flit around you: enemy speed is halved in the aura, and a creature entering it or starting its turn there makes a WIS save — 3d8 radiant (or necrotic) damage, half on a save." },
+  "hunger of hadar": { s:"3rd · conjuration", cast:"1 action", range:"150 ft", comp:"V,S,M", dur:"conc. up to 1 min", text:"A 20-ft sphere of cold, alien blackness: blinded inside, difficult terrain, 2d6 cold at the start of a turn in it, and a DEX save at the end of that turn or 2d6 acid as unseen things bite." }
+};
 const nameSlug = s => String(s).toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g,"")
   .replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");
 const mod = score => Math.floor((score - 10) / 2);
@@ -969,22 +1019,33 @@ function renderSheet() {
     const k = c.spellAbil ? c.spellAbil.slice(0,3) : null;
     const spDC = k ? 8 + pb + mod(c[k]) : null;
     let html = k ? `<div style="font-family:var(--mono);font-size:.66rem;color:var(--ink-faint);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">Spell save DC ${spDC} · atk ${sgn(pb+mod(c[k]))}</div>` : "";
+    // Available slots fill from the left: pip i is full while i < remaining.
     html += c.slots.map((s,si)=>{
-      const pipsH = Array.from({length:s.total},(_,i)=>`<button class="slot ${s.kind==='pact'?'pact':''} ${i>=s.used?'full':''}" data-si="${si}" data-i="${i}" aria-label="slot"></button>`).join("");
+      const remaining = s.total - s.used;
+      const pipsH = Array.from({length:s.total},(_,i)=>`<button class="slot ${s.kind==='pact'?'pact':''} ${i<remaining?'full':''}" data-si="${si}" data-i="${i}" aria-label="${i<remaining?'available slot — click to expend':'expended slot — click to recover'}"></button>`).join("");
       const label = s.kind==="pact" ? `Pact <small>lvl ${s.level} · short rest</small>` : `Level ${s.level}`;
       return `<div class="slotrow"><span class="lvl">${label}</span><div class="slots">${pipsH}</div></div>`;
     }).join("");
     slotHost.innerHTML = html;
+    // Click a full pip: expend ONE. Click an empty pip: recover ONE.
     slotHost.querySelectorAll(".slot").forEach(b=>b.onclick=()=>{
-      const s=c.slots[+b.dataset.si], i=+b.dataset.i, isFull = i>=s.used;
-      s.used = Math.max(0, Math.min(s.total, isFull ? (s.total - i) : (s.total - i - 1)));
+      const s=c.slots[+b.dataset.si], i=+b.dataset.i;
+      const wasFull = i < (s.total - s.used);
+      s.used = Math.max(0, Math.min(s.total, s.used + (wasFull ? 1 : -1)));
       renderSheet(); persistSlot(c, s);
     });
   }
 
-  $("#spells").innerHTML = c.spells.length ? c.spells.map(([n,lv,note])=>
-    `<div class="li"><span class="badge ${lv===0?'cantrip':''}">${lv===0?'C':lv}</span><span class="nm">${n}${note?`<small>${note}</small>`:''}</span></div>`).join("")
-    : `<p style="color:var(--ink-faint);font-size:.85rem">No spells known.</p>`;
+  $("#spells").innerHTML = c.spells.length ? c.spells.map(([n,lv,note])=>{
+    const ref = SPELLBOOK[String(n).toLowerCase()];
+    const detail = ref
+      ? `<div class="spell-stats">${ref.s} · ${ref.cast} · ${ref.range} · ${ref.comp} · ${ref.dur}</div><p>${ref.text} <span class="src">SRD summary</span></p>`
+      : `<p>No entry in the app's SRD pocket-reference — the binder's quick-refs or the GM hold the full text. <span class="src">no rules text</span></p>`;
+    const noteHtml = note ? `<p class="tnote">“${esc(note)}” <span class="src">table note</span></p>` : "";
+    return `<div class="spell-row"><div class="li"><span class="badge ${lv===0?'cantrip':''}">${lv===0?'C':lv}</span><span class="nm">${esc(n)}</span><span class="chev">›</span></div><div class="spell-detail">${detail}${noteHtml}</div></div>`;
+  }).join("") : `<p style="color:var(--ink-faint);font-size:.85rem">No spells known.</p>`;
+  $("#spells").querySelectorAll(".spell-row .li").forEach(r =>
+    r.onclick = () => r.parentElement.classList.toggle("open"));
 
   $("#items").innerHTML = c.items.map(([n,flag,qty,note])=>{
     let tag = flag==="eq" ? `<span class="tag on">equipped</span>` : flag==="att" ? `<span class="tag att">attuned</span>` : "";
