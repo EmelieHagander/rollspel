@@ -162,6 +162,8 @@ button { font-family: inherit; cursor: pointer; }
 .card { background: linear-gradient(180deg, var(--panel), var(--panel-2)); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; box-shadow: var(--shadow); }
 .card > .card-t { display: flex; align-items: center; gap: 8px; margin: -2px 0 14px; font-family: var(--mono); font-size: .68rem; letter-spacing: .2em; text-transform: uppercase; color: var(--gold); }
 .card > .card-t .rule { flex: 1; height: 1px; background: linear-gradient(90deg, var(--line), transparent); }
+.mini-btn { border: 1px solid var(--line); background: var(--bg-2); color: var(--ink-dim); border-radius: 8px; padding: 4px 10px; font-family: var(--mono); font-size: .6rem; letter-spacing: .08em; text-transform: uppercase; flex: none; }
+.mini-btn:hover { color: var(--gold); border-color: var(--violet-dim); }
 
 .grid { display: grid; gap: 16px; }
 .sheet { grid-template-columns: 300px 1fr; align-items: start; }
@@ -354,6 +356,30 @@ button { font-family: inherit; cursor: pointer; }
 
 .foot { padding: 22px 26px 30px; color: var(--ink-faint); font-size: .76rem; font-family: var(--mono); border-top: 1px solid var(--line-soft); max-width: 1180px; }
 .foot b { color: var(--violet); font-weight: 600; }
+
+/* ===================== MOBILE ===================== */
+@media (max-width: 780px) {
+  /* the fixed two-column grids collapse to a single column
+     (!important: they carry inline grid-template-columns) */
+  #storyGrid, #advGrid, #twoCol { grid-template-columns: 1fr !important; }
+  .view { padding: 16px 12px 110px; }
+  .view-head h2 { font-size: 1.45rem; }
+  .topbar { padding: 10px 12px; gap: 10px; }
+  .topbar .whoami { display: none; }        /* live/demo state remains in the footer */
+  .crest { width: 38px; height: 38px; font-size: 1.1rem; }
+  .who .nm { font-size: 1rem; }
+  .who .sub { font-size: .7rem; }
+  .switcher button { width: 30px; height: 30px; }
+  .card { padding: 14px 14px; border-radius: 14px; }
+  #beats { max-height: 62vh; }
+  .beat p { font-size: .95rem; }
+  .combatant { grid-template-columns: 36px 1fr auto; gap: 10px; padding: 10px 10px; }
+  .init { font-size: 1.35rem; }
+  .fab { right: 14px; bottom: 14px; width: 54px; height: 54px; }
+  .tray { left: 12px; right: 12px; width: auto; bottom: 82px; }
+  .skills { columns: 1; }
+  .foot { padding: 16px 12px 24px; }
+}
 </style>
 
 <!-- ============================ LOGIN ============================ -->
@@ -538,7 +564,7 @@ button { font-family: inherit; cursor: pointer; }
         </div>
         <div class="grid" style="grid-template-columns:1.4fr .9fr;gap:16px" id="advGrid">
           <div class="card">
-            <div class="card-t">The story so far <span class="rule"></span></div>
+            <div class="card-t">The story so far <span class="rule"></span><button class="mini-btn" id="beatSort" title="Flip reading order">↑ oldest first</button></div>
             <div id="beats"></div>
           </div>
           <div class="grid" style="gap:16px">
@@ -1124,14 +1150,29 @@ async function loadAdventureContent() {
   renderBeats((beats.data || []).reverse());
   renderAdvParty(links.data || []);
 }
+let BEAT_DESC = localStorage.getItem("codex-beat-order") === "desc";
+let LAST_BEATS = [];
+function beatSortLabel() {
+  $("#beatSort").textContent = BEAT_DESC ? "↓ newest first" : "↑ oldest first";
+}
+$("#beatSort").onclick = () => {
+  BEAT_DESC = !BEAT_DESC;
+  localStorage.setItem("codex-beat-order", BEAT_DESC ? "desc" : "asc");
+  beatSortLabel();
+  renderBeats(LAST_BEATS);
+};
+beatSortLabel();
 function renderBeats(rows) {
+  LAST_BEATS = rows;
   const host = $("#beats");
-  const stick = host.scrollHeight - host.scrollTop - host.clientHeight < 80;
+  // chat mode (oldest first) sticks to the bottom; newest-first stays pinned to the top
+  const stick = !BEAT_DESC && (host.scrollHeight - host.scrollTop - host.clientHeight < 80);
   if (!rows.length) {
     host.innerHTML = `<p style="color:var(--ink-faint);font-size:.85rem">Nothing written yet — the night is young.</p>`;
     return;
   }
-  host.innerHTML = rows.map(b => {
+  const view = BEAT_DESC ? [...rows].reverse() : rows;
+  host.innerHTML = view.map(b => {
     const who = b.kind === "dialogue" && b.speaker ? `<span class="speaker">${esc(b.speaker)}:</span> ` : "";
     const meta = [b.kind, (b.kind !== "dialogue" && b.speaker) ? esc(b.speaker) : null].filter(Boolean).join(" · ");
     const when = b.created_at ? new Date(b.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
