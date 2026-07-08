@@ -1,10 +1,11 @@
 # Database quick-ref (D&D 5e)
 
 > **What this doc is:** the table-side reference to the character vault's SQL
-> surface — the two read views and seventeen write verbs in schema `rpg` of
+> surface — the read views and write verbs in schema `rpg` of
 > Supabase project `yuobtgoidmmmwfqenkau`. Read it whole at session start.
-> **Source of truth:** migration `db/migrations/0003_adventures_and_gm_surface.sql`
-> and its function comments. This doc summarizes; the migration decides.
+> **Source of truth:** migrations `db/migrations/0003_adventures_and_gm_surface.sql`
+> and `db/migrations/0005_story_beats.sql`, and their function comments.
+> This doc summarizes; the migrations decide.
 
 ---
 
