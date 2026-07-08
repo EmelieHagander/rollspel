@@ -8,19 +8,20 @@
 
 ## 1. The game
 
-- **System: D&D 5th edition.** Rules-as-written from the 5e SRD is the baseline; deviations are house rules and live written down in `rules/house-rules.md` — a ruling that isn't written down doesn't exist. Format of play: **one-shots** (self-contained single-session adventures).
-- Content lives as markdown, organized so a GPT can find it by path alone:
+- **Systems:** D&D 5th edition (active); Vampire the Masquerade and Trudvang (planned). For 5e, rules-as-written from the SRD is the baseline; deviations are house rules and live written down in `rules/dnd5e/house-rules.md` — a ruling that isn't written down doesn't exist. Format of play: **one-shots** (self-contained single-session adventures).
+- Content lives as markdown, organized so a GPT can find it by path alone — **type-first shelves, system subfolders** (full map: `docs/binder-structure.md`):
 
 ```text
-rules/        ← house rules, table conventions, safety tools
-adventures/   ← one adventure per folder: hook, scenes, NPCs, loot, secrets
-characters/   ← player characters and recurring NPCs
-sessions/     ← session logs and recaps
-prompts/      ← the GM prompt(s) the GPT runs on
-docs/         ← how this repo itself works (prompt-authoring, decisions)
+rules/        ← shelf root: system-agnostic (safety-tools, table-conventions);
+                rules/dnd5e/ etc. for system-specific (house rules, SRD quick-refs)
+adventures/   ← adventures/dnd5e/<kebab-title>/ — hook, scenes, NPCs, loot, secrets
+characters/   ← characters/dnd5e/ — player characters and recurring NPCs
+sessions/     ← sessions/dnd5e/ — session recaps (<yyyy-mm-dd>-<adventure-slug>.md)
+prompts/      ← the GM prompts, flat, one per system: gm-dnd5e.md (gm-vtm.md later)
+docs/         ← how this repo itself works (binder map, prompt-authoring, decisions)
 ```
 
-Folders are created when their first real content arrives — no empty scaffolding.
+System tags: `dnd5e` (active), `vtm`, `trudvang` (planned — zero disk presence until first real content). Folders are created when their first real content arrives — no empty scaffolding.
 
 ## 2. The database
 
@@ -38,6 +39,7 @@ Agents live at `.claude/agents/`. The main session delegates domain work rather 
 |---|---|---|---|
 | **Dobby** (`dobby.md`) | Database | Everything in schema `rpg` in the shared Supabase project: tables, migrations, enums, functions, seeds. | Touching anything outside schema `rpg`. Editing applied migrations. Game content. |
 | **Douglas** (`douglas.md`) | Prompt authoring | The Storybook Author Rewrite System — every agent prompt written or substantially revised in this repo passes through his full pipeline, ending in the Douglas Adams author pass. | Writing code, SQL, or game content. Style-sprinkling without the full pipeline. |
+| **Archie** (`archie.md`) | Binder structure | The campaign binder as a system — folder layout, doc placement and moves, templates, the binder map (`docs/binder-structure.md`), navigability-by-path for the table-side GPT. Owns a doc's form and place, never its subject-matter. | Authoring game content. SQL (Dobby). Prompt authoring (Douglas). Deleting content (archives/moves instead). |
 
 ## 4. Hard rules
 
