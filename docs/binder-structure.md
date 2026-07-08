@@ -60,7 +60,8 @@ sessions/
 prompts/                       ← flat; the system tag lives in the filename
 ├── gm-dnd5e.md                ← the GM prompt — read by path, mid-session
 ├── first-evening-dnd5e.md     ← paste-in for a new table's FIRST evening
-└── every-evening-dnd5e.md     ← paste-in address card for every later evening
+├── every-evening-dnd5e.md     ← paste-in address card for every later evening
+└── character-creation-dnd5e.md ← paste-in character workshop, any day, no evening
 
 docs/                          ← about the repo itself; never system-namespaced
 ```
@@ -110,22 +111,27 @@ the second one-shot.
 ## Prompts
 
 Prompts live flat in `prompts/`, tag in filename. A system's full set is
-**three documents**, split by who reads them and when:
+**four documents**, split by who reads them and when:
 
 | Path | Reader, and when |
 |---|---|
-| `prompts/gm-<tag>.md` | The table-side GPT, by path, every session — the GM prompt itself: who to be and how to run the game. Both cards below point their reader at it. |
+| `prompts/gm-<tag>.md` | The table-side GPT, by path, every session — the GM prompt itself: who to be and how to run the game. Both evening cards point their reader at it. |
 | `prompts/first-evening-<tag>.md` | The owner, once per new table — copied, blanks filled, pasted into a fresh GPT for the **first** evening: session zero (characters created from player info, players rolling their own dice, registration via the vault verbs, dossiers) plus the first adventure's kickoff. |
 | `prompts/every-evening-<tag>.md` | The owner, every **later** evening — the address card: where the binder and vault are, how to get in, what tonight's adventure and table are. |
+| `prompts/character-creation-<tag>.md` | The owner and a player, **any time — no evening required**. Pasted into a fresh GPT, it is a standalone character-creation helper — **not a GM**, bound to no session: it builds characters at the player's pace (however many questions that takes), answers the system's rules questions along the way, saves finished characters to the vault, and files their binder dossiers. Self-contained; it never points at the GM prompt. |
 
-The two cards are the owner's paste-in templates and answer one question —
-*which do I paste tonight?* — by name alone: first evening, `first-evening-`;
-any other evening, `every-evening-`. Each card is self-contained (a first
-evening does not also need the address card). For D&D 5e:
+Three of the four are the owner's paste-in templates and answer one
+question — *which do I paste?* — by name alone: a table's first evening,
+`first-evening-`; any later evening, `every-evening-`; no evening at all,
+just a character to build, `character-creation-`. Each is self-contained
+(a first evening does not also need the address card; a Tuesday-lunch
+character workshop needs no evening card at all). For D&D 5e:
 
 - `prompts/gm-dnd5e.md`, `prompts/first-evening-dnd5e.md`,
   `prompts/every-evening-dnd5e.md` — now
-- the `vtm` and `trudvang` trios — when those systems arrive
+- `prompts/character-creation-dnd5e.md` — reserved: the address is ruled
+  here, the content is Douglas's (CLAUDE.md §4.2)
+- the `vtm` and `trudvang` quartets — when those systems arrive
 
 *(History: `every-evening-dnd5e.md` was born `prompts/first-contact.md` and was
 `git mv`'d when the true first-evening document arrived and took the "first"
@@ -142,11 +148,18 @@ is a document lost, politely. For 5e, the runtime protocol's address is the
 reserved in the map's usual sense: the address is ruled here, the content is
 authored elsewhere (prompt content goes through Douglas, CLAUDE.md §4.2).
 
-Three named files per system do not earn a subfolder. If a system ever needs
-several prompt *variants* — genuinely alternative prompts for the same seat,
-not chapters of one prompt — or otherwise outgrows its trio, that system gets
-`prompts/<tag>/` and this map is updated first. A runtime protocol is a
-chapter, never a variant; it does not trigger the migration.
+Four named files per system do not earn a subfolder — **ruled 2026-07-08**,
+when the character-creation helper became the fourth. What triggers
+`prompts/<tag>/` is prompt *variants*: several genuinely alternative prompts
+for the **same seat** (two rival GM prompts, say), whose filenames could no
+longer tell the reader which one to take. A new **seat** — a distinct
+reader-and-occasion with its own unmistakable name, as the character
+workshop is — extends the flat set instead: the trio is a quartet now and
+may grow seat by seat, this map updating first each time. The honest limit
+stands: the day the flat shelf stops answering *which do I paste?* by name
+alone, that system graduates to `prompts/<tag>/`, this map updates first,
+and every citation moves in the same commit. A runtime protocol is a
+chapter, never a variant or a seat; it triggers nothing.
 
 ## The reference library the GM prompt cites
 
