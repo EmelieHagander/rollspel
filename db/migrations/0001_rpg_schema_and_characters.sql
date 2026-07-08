@@ -22,6 +22,13 @@
 --                          + proficiency_bonus if perception row exists in
 --                          character_skills (doubled on expertise). Not stored.
 --   * AC, speed, HP, hit dice, death saves — STORED live session state.
+--   * coin — STORED as five dedicated columns (cp/sp/ep/gp/pp): the full 5e
+--     coin set, so a platinum hoard or electrum pouch never needs a migration.
+--   * spell slots carry a slot_kind dimension (standard | pact) so warlock
+--     Pact Magic (short-rest recharge) coexists with standard slots for
+--     multiclass warlocks.
+--   * attunement cap (3 items) — GM-enforced table rule, documented in the
+--     character_items comment; no trigger (owner-confirmed).
 --
 -- RLS: ENABLED on every table, with NO policies. This is a shared Supabase
 -- project; deny-by-default protects the room if the `rpg` schema is ever
@@ -67,6 +74,11 @@ create type rpg.alignment as enum (
 
 -- Hit dice only; d4/d20 are not hit dice for any 5e class.
 create type rpg.hit_die as enum ('d6', 'd8', 'd10', 'd12');
+
+-- Spell-slot pools: 'standard' (long-rest recharge) vs 'pact' (warlock Pact
+-- Magic, short-rest recharge). Separate rows per pool let a multiclass
+-- warlock track both at once.
+create type rpg.slot_kind as enum ('standard', 'pact');
 
 -- ---------------------------------------------------------------------------
 -- Helper functions (small, single-purpose, reusable)
@@ -159,6 +171,15 @@ create table rpg.characters (
   -- this + proficiency_bonus, so they are not stored
   spellcasting_ability  rpg.ability,
 
+  -- coin: the full 5e set (cp/sp/ep/gp/pp), not just gp/sp/cp — all five are
+  -- SRD currencies, the two extra columns cost nothing, and SRD loot tables
+  -- pay out electrum and platinum, so this spares a certain future migration
+  coins_cp              integer       not null default 0 check (coins_cp >= 0),
+  coins_sp              integer       not null default 0 check (coins_sp >= 0),
+  coins_ep              integer       not null default 0 check (coins_ep >= 0),
+  coins_gp              integer       not null default 0 check (coins_gp >= 0),
+  coins_pp              integer       not null default 0 check (coins_pp >= 0),
+
   notes                 text,
 
   created_at            timestamptz   not null default now(),
@@ -232,17 +253,18 @@ alter table rpg.character_items enable row level security;
 -- ---------------------------------------------------------------------------
 
 create table rpg.character_spell_slots (
-  character_id    uuid      not null references rpg.characters (id) on delete cascade,
-  slot_level      smallint  not null check (slot_level between 1 and 9),
-  slots_total     smallint  not null check (slots_total >= 0),
-  slots_expended  smallint  not null default 0,
-  primary key (character_id, slot_level),
+  character_id    uuid           not null references rpg.characters (id) on delete cascade,
+  slot_kind       rpg.slot_kind  not null default 'standard',
+  slot_level      smallint       not null check (slot_level between 1 and 9),
+  slots_total     smallint       not null check (slots_total >= 0),
+  slots_expended  smallint       not null default 0,
+  primary key (character_id, slot_kind, slot_level),
   constraint character_spell_slots_expended_within_total
     check (slots_expended between 0 and slots_total)
 );
 
 comment on table rpg.character_spell_slots is
-  'Live spell-slot tracking per spell level (1-9): total available and expended this session; a long rest resets slots_expended to 0.';
+  'Live spell-slot tracking per pool and spell level (1-9): total available and expended this session. Kind ''standard'' resets slots_expended to 0 on a long rest; kind ''pact'' (warlock Pact Magic) resets on a short or long rest — a multiclass warlock carries rows of both kinds.';
 
 -- FK index: covered by the primary key (character_id is its leading column).
 
