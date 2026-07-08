@@ -233,6 +233,17 @@ button { font-family: inherit; cursor: pointer; }
 .secret.open .body { display: block; animation: fade .3s ease; }
 .secret.open button { border-style: solid; border-radius: 11px 11px 0 0; color: var(--gold); border-color: var(--line); }
 
+/* live story beats */
+#beats { max-height: 540px; overflow-y: auto; }
+.beat { padding: 10px 2px; border-bottom: 1px solid var(--line-soft); }
+.beat:last-child { border: none; }
+.beat .bmeta { font-family: var(--mono); font-size: .58rem; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 3px; display: flex; gap: 8px; align-items: center; }
+.beat p { margin: 0; white-space: pre-wrap; max-width: 68ch; font-size: .92rem; }
+.beat.narration p { font-family: var(--serif); color: var(--ink-dim); }
+.beat.dialogue .speaker { color: var(--gold); font-weight: 600; }
+.beat.roll p, .beat.mechanics p { font-family: var(--mono); font-size: .82rem; color: var(--ink-dim); }
+.beat.system p { font-family: var(--mono); font-size: .74rem; color: var(--ink-faint); }
+
 .enc-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
 .round { font-family: var(--serif); font-weight: 700; font-size: 1.1rem; }
 .round small { color: var(--ink-faint); font-family: var(--mono); font-size: .66rem; letter-spacing: .12em; text-transform: uppercase; display: block; font-weight: 400; }
@@ -455,11 +466,40 @@ button { font-family: inherit; cursor: pointer; }
     <!-- ===== STORY ===== -->
     <section class="view" id="view-story">
       <div class="view-head">
-        <span class="eyebrow">adventures/dnd5e/the‑drowned‑bell</span>
-        <h2>The Drowned Bell</h2>
-        <p>A fishing town rings a bell no living hand pulls. Something under the harbour is counting the hours until it's free.</p>
-        <span class="local-note">◈ sample adventure — no table yet in the schema</span>
+        <span class="eyebrow" id="storyEyebrow">adventures/dnd5e/the‑drowned‑bell</span>
+        <h2 id="storyTitle">The Drowned Bell</h2>
+        <p id="storyDesc">A fishing town rings a bell no living hand pulls. Something under the harbour is counting the hours until it's free.</p>
+        <span class="local-note" id="storyLocalNote">◈ sample adventure — offline preview</span>
       </div>
+
+      <!-- live story stream (shown when signed in) -->
+      <div id="storyLive" style="display:none">
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-t">The ledger of adventures <span class="rule"></span></div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+            <select id="advPick" style="flex:1;min-width:220px;background:var(--bg-2);border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:11px 12px;font-family:var(--sans);font-size:.92rem"></select>
+            <button class="btn" id="advRefresh">↻ Refresh</button>
+            <span class="pill live" id="advLivePill" style="display:none">streaming</span>
+          </div>
+        </div>
+        <div class="grid" style="grid-template-columns:1.4fr .9fr;gap:16px" id="advGrid">
+          <div class="card">
+            <div class="card-t">The story so far <span class="rule"></span></div>
+            <div id="beats"></div>
+          </div>
+          <div class="grid" style="gap:16px">
+            <div class="card">
+              <div class="card-t">The party <span class="rule"></span></div>
+              <div class="list" id="advParty"></div>
+            </div>
+            <div class="card">
+              <div class="card-t">The GM's ledger <span class="rule"></span></div>
+              <p style="color:var(--ink-faint);font-size:.8rem;margin:0">Rulings, threads and secrets-in-motion live in the GM's private log — revealed at the table, not on this page. Secrets are treasure, not narration.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="grid" style="grid-template-columns:1.4fr .9fr;gap:16px" id="storyGrid">
         <div class="card">
           <div class="card-t">The night so far <span class="rule"></span></div>
@@ -789,6 +829,25 @@ function renderSheet() {
 }
 
 function renderStory() {
+  const live = LIVE && !demoMode;
+  $("#storyLive").style.display = live ? "" : "none";
+  $("#storyGrid").style.display = live ? "none" : "";
+  $("#storyLocalNote").style.display = live ? "none" : "";
+
+  if (live) {
+    const a = ADV.list.find(x => x.id === ADV.id);
+    $("#storyEyebrow").textContent = a ? `rpg.adventures · ${a.slug} · ${a.system}` : "rpg.adventures · the ledger";
+    $("#storyTitle").textContent = a ? a.title : "The ledger of adventures";
+    $("#storyDesc").textContent = a
+      ? (a.notes || `Status: ${String(a.status).replace(/_/g," ")}. The GM's pen writes below as the table plays.`)
+      : (ADV.list.length ? "Choose an adventure to open its story stream." : "The ledger is empty — the GM hasn't opened an adventure yet.");
+  } else {
+    $("#storyEyebrow").textContent = "adventures/dnd5e/the‑drowned‑bell";
+    $("#storyTitle").textContent = "The Drowned Bell";
+    $("#storyDesc").textContent = "A fishing town rings a bell no living hand pulls. Something under the harbour is counting the hours until it's free.";
+  }
+
+  // offline sample (hidden in live mode)
   $("#scenes").innerHTML = SCENES.map(s=>{
     const cls = s.state==="now"?"now":s.state==="done"?"done":"";
     const chip = s.state==="now"?`<span class="chip now">you are here</span>`:s.state==="done"?`<span class="chip done">done</span>`:"";
@@ -801,6 +860,90 @@ function renderStory() {
   }).join("");
   $("#secrets").querySelectorAll(".secret button").forEach(b=>b.onclick=()=>b.parentElement.classList.toggle("open"));
 }
+
+/* ===================== LIVE ADVENTURE STREAM (rpg.adventures + story_beats) ===================== */
+const ADV = { list: [], id: null, timer: null };
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+async function loadAdventures() {
+  const { data, error } = await sb.schema(RPG).from("adventures")
+    .select("*").order("created_at", { ascending: true });
+  if (error) throw error;
+  ADV.list = data || [];
+}
+function advPickRender() {
+  const sel = $("#advPick");
+  if (!ADV.list.length) {
+    sel.innerHTML = `<option value="">No adventures in the ledger yet</option>`;
+    ADV.id = null;
+    return;
+  }
+  sel.innerHTML = `<option value="">— choose an adventure —</option>` + ADV.list.map(a =>
+    `<option value="${a.id}">${esc(a.title)} · ${esc(a.slug)} (${esc(a.status)})</option>`).join("");
+  const remembered = localStorage.getItem("codex-adventure");
+  if (remembered && ADV.list.some(a => a.id === remembered)) { sel.value = remembered; ADV.id = remembered; }
+  else if (ADV.list.length === 1) { sel.value = ADV.list[0].id; ADV.id = ADV.list[0].id; }
+}
+async function loadAdventureContent() {
+  if (!ADV.id) {
+    $("#beats").innerHTML = $("#advParty").innerHTML =
+      `<p style="color:var(--ink-faint);font-size:.85rem">Pick an adventure above.</p>`;
+    return;
+  }
+  const from = t => sb.schema(RPG).from(t);
+  // session_events is deliberately NOT read: it is the GM's private log.
+  const [beats, links] = await Promise.all([
+    from("story_beats").select("*").eq("adventure_id", ADV.id).order("id", { ascending: false }).limit(300),
+    from("adventure_characters").select("*").eq("adventure_id", ADV.id)
+  ]);
+  renderBeats((beats.data || []).reverse());
+  renderAdvParty(links.data || []);
+}
+function renderBeats(rows) {
+  const host = $("#beats");
+  const stick = host.scrollHeight - host.scrollTop - host.clientHeight < 80;
+  if (!rows.length) {
+    host.innerHTML = `<p style="color:var(--ink-faint);font-size:.85rem">Nothing written yet — the night is young.</p>`;
+    return;
+  }
+  host.innerHTML = rows.map(b => {
+    const who = b.kind === "dialogue" && b.speaker ? `<span class="speaker">${esc(b.speaker)}:</span> ` : "";
+    const meta = [b.kind, (b.kind !== "dialogue" && b.speaker) ? esc(b.speaker) : null].filter(Boolean).join(" · ");
+    const when = b.created_at ? new Date(b.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+    return `<div class="beat ${esc(b.kind)}"><div class="bmeta">${meta}<span style="margin-left:auto">${when}</span></div><p>${who}${esc(b.content)}</p></div>`;
+  }).join("");
+  if (stick) host.scrollTop = host.scrollHeight;   // follow the newest line, like a table listens
+}
+function renderAdvParty(links) {
+  const host = $("#advParty");
+  host.innerHTML = links.length ? links.map(l => {
+    const c = PARTY.find(p => p.dbId === l.character_id);
+    return `<div class="li"><span class="nm">${c ? esc(c.name) : "An adventurer"}<small>${c ? `${esc(c.klass)} · level ${c.level}` : "not in the visible vault"}</small></span></div>`;
+  }).join("") : `<p style="color:var(--ink-faint);font-size:.85rem">No characters bound to this adventure yet.</p>`;
+}
+function advStartPoll() {
+  advStopPoll();
+  if (!(LIVE && !demoMode) || !ADV.id) return;
+  ADV.timer = setInterval(() => {
+    if (document.visibilityState === "visible" && $("#view-story").classList.contains("on"))
+      loadAdventureContent().catch(() => {});
+  }, 12000);
+  $("#advLivePill").style.display = "";
+}
+function advStopPoll() {
+  if (ADV.timer) { clearInterval(ADV.timer); ADV.timer = null; }
+  $("#advLivePill").style.display = "none";
+}
+$("#advPick").onchange = () => {
+  ADV.id = $("#advPick").value || null;
+  localStorage.setItem("codex-adventure", ADV.id || "");
+  renderStory();
+  loadAdventureContent().catch(e => toast("Couldn't open the story: " + (e.message || e), true));
+  advStartPoll();
+};
+$("#advRefresh").onclick = () =>
+  loadAdventures().then(advPickRender).then(loadAdventureContent).then(renderStory)
+    .catch(e => toast("Couldn't refresh the ledger: " + (e.message || e), true));
 
 function renderEnc() {
   $("#roundNo").textContent = COMBAT.round;
@@ -911,8 +1054,11 @@ async function enterLive(email){
     const party = await loadParty();
     PARTY = party;                          // live vault only — no demo fallback here
     current = party.length ? party[0] : null;
+    try { await loadAdventures(); } catch (e) { ADV.list = []; }  // ledger optional: degrades gracefully
     setLiveBadges(email);
+    advPickRender();
     renderAll(); showApp();
+    if (ADV.id) { loadAdventureContent().catch(()=>{}); advStartPoll(); }
     if(!party.length) toast("Signed in — your vault is empty, ready for a real party");
   } catch (e) {
     const msg = (e && (e.message || e.hint || e.details)) || String(e);
@@ -925,6 +1071,7 @@ async function enterLive(email){
   }
 }
 function enterDemo(){
+  advStopPoll();
   demoMode = true; PARTY = cloneMock(); current = PARTY[0];
   setLiveBadges(null); renderAll(); showApp();
 }
@@ -980,6 +1127,7 @@ $("#loginForm").onsubmit = e => {
 };
 $("#demoLink").onclick = enterDemo;
 $("#logoutBtn").onclick = async () => {
+  advStopPoll();
   if(LIVE && !demoMode && sb){ try { await sb.auth.signOut(); } catch(e){} }
   $("#pw").value = ""; authErr("");
   showLogin();
