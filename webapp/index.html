@@ -124,6 +124,22 @@ button { font-family: inherit; cursor: pointer; }
 }
 .portrait-frame::after { content: ""; position: absolute; inset: 0; border-radius: 16px; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 25%, transparent); }
 .portrait-frame.on { display: block; }
+.portrait-frame.uploadable { display: block; cursor: pointer; transition: border-color .15s, transform .12s; }
+.portrait-frame.uploadable:hover { border-color: var(--gold); transform: translateY(-1px); }
+.portrait-frame.empty { border-style: dashed; }
+.portrait-frame.empty::before {
+  content: "＋ add art"; position: absolute; inset: 0; display: grid; place-items: center;
+  font-family: var(--mono); font-size: .6rem; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.portrait-frame.empty:hover::before { color: var(--gold); }
+.portrait-frame .rmart {
+  position: absolute; top: 5px; right: 5px; z-index: 2; width: 22px; height: 22px;
+  border-radius: 7px; border: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 75%, transparent);
+  color: var(--ink-dim); font-size: .7rem; line-height: 1; opacity: 0; transition: opacity .15s;
+}
+.portrait-frame:hover .rmart { opacity: 1; }
+.portrait-frame .rmart:hover { color: var(--blood); border-color: var(--blood); }
 @media (max-width: 620px){ .portrait-frame { width: 84px; height: 84px; } }
 .who .nm { font-family: var(--serif); font-size: 1.12rem; font-weight: 600; line-height: 1.15; }
 .who .sub { font-size: .78rem; color: var(--ink-dim); }
@@ -408,7 +424,8 @@ button { font-family: inherit; cursor: pointer; }
     <!-- ===== CHARACTER SHEET ===== -->
     <section class="view on" id="view-sheet">
       <div class="view-head">
-        <div class="portrait-frame" id="shPortrait" role="img" aria-label="Character portrait"></div>
+        <div class="portrait-frame" id="shPortrait" role="button" tabindex="0" aria-label="Character portrait — click to add or change art" title="Click to add or change art"><button class="rmart" id="rmArt" aria-label="Remove art" style="display:none">✕</button></div>
+        <input type="file" id="artFile" accept="image/*" hidden />
         <span class="eyebrow">The vault · rpg.characters</span>
         <h2 id="shName">Vesper Quill</h2>
         <p id="shTag">"I made a bargain with something that laughs in the dark. It's been very generous."</p>
@@ -715,7 +732,16 @@ async function loadParty() {
   const pick = (res, id) => (res.data || []).filter(x => x.character_id === id);
   // players (named characters) first, then the rest, each alphabetical
   chars.sort((a,b) => ((b.player_name?1:0) - (a.player_name?1:0)) || a.name.localeCompare(b.name));
-  return chars.map(c => mapChar(c, pick(sk,c.id), pick(sl,c.id), pick(sp,c.id), pick(it,c.id)));
+  const mapped = chars.map(c => mapChar(c, pick(sk,c.id), pick(sl,c.id), pick(sp,c.id), pick(it,c.id)));
+  // vault-stored portraits ride separately so the fat blobs never join the party query
+  try {
+    const { data: art } = await from("character_art").select("character_id, data_url").in("character_id", ids);
+    (art || []).forEach(a => {
+      const m = mapped.find(c => c.dbId === a.character_id);
+      if (m) { m._art = a.data_url; m._artFromDb = true; }
+    });
+  } catch (e) { /* art table optional: the app falls back to convention/crest */ }
+  return mapped;
 }
 async function persist(c, patch) {
   if (!c.dbId || demoMode || !LIVE) return;
@@ -801,6 +827,60 @@ function paintCrest(el, c) {
     el.classList.add("has-art"); el.style.backgroundImage = `url("${url}")`;
   });
 }
+/* --- art upload: click the frame, image is downscaled client-side and kept in the vault --- */
+function downscaleImage(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const s = Math.min(1, 512 / Math.max(img.width, img.height));
+      const cv = document.createElement("canvas");
+      cv.width = Math.max(1, Math.round(img.width * s));
+      cv.height = Math.max(1, Math.round(img.height * s));
+      cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+      let out = cv.toDataURL("image/webp", 0.85);
+      if (!out.startsWith("data:image/webp")) out = cv.toDataURL("image/jpeg", 0.85);
+      resolve(out);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("not an image the frame understands")); };
+    img.src = url;
+  });
+}
+$("#shPortrait").onclick = () => { if (current) $("#artFile").click(); };
+$("#shPortrait").onkeydown = e => {
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (current) $("#artFile").click(); }
+};
+$("#artFile").onchange = async () => {
+  const f = $("#artFile").files[0]; $("#artFile").value = "";
+  if (!f || !current) return;
+  const c = current;
+  try {
+    const dataUrl = await downscaleImage(f);
+    if (LIVE && !demoMode && c.dbId) {
+      const { error } = await sb.schema(RPG).from("character_art")
+        .upsert({ character_id: c.dbId, data_url: dataUrl });
+      if (error) throw error;
+      c._artFromDb = true; toast("Portrait kept in the vault");
+    } else {
+      c._artFromDb = false; toast("Demo — portrait shown, not saved");
+    }
+    c._art = dataUrl; renderSheet(); renderSwitcher();
+  } catch (err) { toast("The frame refused it: " + (err.message || err), true); }
+};
+$("#rmArt").onclick = async (e) => {
+  e.stopPropagation();
+  const c = current; if (!c) return;
+  try {
+    if (LIVE && !demoMode && c.dbId && c._artFromDb) {
+      const { error } = await sb.schema(RPG).from("character_art").delete().eq("character_id", c.dbId);
+      if (error) throw error;
+    }
+    delete c._art; c._artFromDb = false;
+    renderSheet(); renderSwitcher(); toast("Portrait removed");
+  } catch (err) { toast("Couldn't remove it: " + (err.message || err), true); }
+};
+
 function renderSwitcher() {
   $("#switcher").innerHTML = PARTY.map(p =>
     `<button class="${p.id===current.id?'on':''}" data-id="${p.id}" title="${p.name}">${p.initial}</button>`).join("");
@@ -814,7 +894,7 @@ function renderSwitcher() {
 function renderEmptySheet() {
   $("#sheetGrid").style.display = "none";
   $("#emptyVault").style.display = "";
-  $("#shPortrait").classList.remove("on");
+  $("#shPortrait").classList.remove("on", "uploadable", "empty");
   $("#tbCrest").classList.remove("has-art");
   $("#tbCrest").style.backgroundImage = "";
   $("#tbCrest").textContent = "·";
@@ -831,10 +911,14 @@ function renderSheet() {
   const c = current, pb = profBonus(c.level);
   paintCrest($("#tbCrest"), c);
   const pf = $("#shPortrait");
-  pf.classList.remove("on"); pf.style.backgroundImage = ""; pf.dataset.artFor = c.id;
+  pf.classList.add("uploadable", "empty"); pf.classList.remove("on");
+  pf.style.backgroundImage = ""; pf.dataset.artFor = c.id;
+  $("#rmArt").style.display = "none";
   resolveArt(c, url => {
     if (!url || pf.dataset.artFor !== c.id) return;
-    pf.style.backgroundImage = `url("${url}")`; pf.classList.add("on");
+    pf.style.backgroundImage = `url("${url}")`;
+    pf.classList.add("on"); pf.classList.remove("empty");
+    if (c._artFromDb || (demoMode && c._art)) $("#rmArt").style.display = "";
   });
   $("#tbName").textContent = c.name;
   $("#tbSub").innerHTML = `Level ${c.level} ${c.species} ${c.klass}${c.subclass?` · <b>${c.subclass}</b>`:''}`;
