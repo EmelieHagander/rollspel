@@ -5,11 +5,10 @@
 > of Supabase project `yuobtgoidmmmwfqenkau`. Read it whole at session start.
 > **Source of truth:** migrations `db/migrations/0003_adventures_and_gm_surface.sql`,
 > `db/migrations/0005_story_beats.sql`, `db/migrations/0006_gm_prep_tables.sql`,
-> `db/migrations/0011_session_notebook.sql`, and
-> `db/migrations/0012_encounters_and_combat_board.sql` (the last two renumbered
-> from `0004`/`0005` — main took those numbers for `rpg_api_access` and
-> `story_beats`), and their function comments. This doc summarizes; the
-> migrations decide.
+> `db/migrations/0012_session_notebook.sql`, and
+> `db/migrations/0013_encounters_and_combat_board.sql` (the last two renumbered
+> to append after main's sequence), and their function comments. This doc
+> summarizes; the migrations decide.
 
 ---
 
