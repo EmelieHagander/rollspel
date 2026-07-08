@@ -1,10 +1,11 @@
 # Database quick-ref (D&D 5e)
 
-> **What this doc is:** the table-side reference to the character vault's SQL
-> surface — the read views and write verbs in schema `rpg` of
-> Supabase project `yuobtgoidmmmwfqenkau`. Read it whole at session start.
-> **Source of truth:** migrations `db/migrations/0003_adventures_and_gm_surface.sql`
-> and `db/migrations/0005_story_beats.sql`, and their function comments.
+> **What this doc is:** the table-side reference to the database's SQL
+> surface — the read views, write verbs, and GM-private tables in schema `rpg`
+> of Supabase project `yuobtgoidmmmwfqenkau`. Read it whole at session start.
+> **Source of truth:** migrations `db/migrations/0003_adventures_and_gm_surface.sql`,
+> `db/migrations/0005_story_beats.sql`, and
+> `db/migrations/0006_gm_prep_tables.sql`, and their function comments.
 > This doc summarizes; the migrations decide.
 
 ---
@@ -127,6 +128,17 @@ rulings-in-progress, and threads go to your private log via `rpg.log_event`
 (`rpg.session_events`, invisible to players). Opposite audiences; never mix.
 Source of truth: `db/migrations/0005_story_beats.sql`.
 
+**The three-way split — do not blur it:**
+
+| Table | What it is |
+|---|---|
+| `rpg.plot_points` | GM-**private prep state** with a lifecycle — written before the session, mutated during it. Not a log. |
+| `rpg.session_events` | GM-**private append-only log** — what happened, as it happened. |
+| `rpg.story_beats` | player-**public append-only stream** — the story as the players hear it. |
+
+Revealing a plot point flips bookkeeping only — it tells the players nothing.
+Telling the players goes through `rpg.narrate`, always.
+
 - `rpg.narrate('<adventure-slug>', 'content', kind, speaker)` — append one
   beat. `kind` defaults to `narration`, `speaker` to `GM`. Kinds:
   `narration` (GM prose) · `dialogue` (attributed speech — set `speaker`) ·
@@ -135,6 +147,37 @@ Source of truth: `db/migrations/0005_story_beats.sql`.
 - `rpg.story_so_far('<adventure-slug>', limit)` — the recent beats in
   chronological order (default 50). Call it at session start: if a stream
   already exists, you are resuming that story, not starting a new one.
+
+### The GM prep layer — private: areas, NPCs, plot points
+
+Three GM-private tables holding what you prep before the session and mutate
+live at the table. All three are **API-invisible** (RLS with no policies, anon
+revoked) — only the GM's trusted tooling reads and writes them, and nothing in
+them reaches players except through your voice. On each narrative table,
+`description` is player-facing (safe to read aloud) and `gm_notes` is GM-only
+(never read aloud) — the line is drawn in the schema, not in your judgment.
+Source of truth: `db/migrations/0006_gm_prep_tables.sql`.
+
+| Table | One row is | At the table |
+|---|---|---|
+| `rpg.areas` | one location/scene of an adventure | `name` (unique per adventure, case-insensitive), `description` / `gm_notes`, **`visited`** (live: has the party been here — flip it as they move), `sort_order` (null when the adventure is not linear). |
+| `rpg.npcs` | one creature you run, social or hostile | `role`, `disposition` (`friendly`\|`neutral`\|`wary`\|`hostile`, default `neutral` — a live dial), `status` (`alive`\|`dead`\|`missing`\|`unknown`), `description` / `gm_notes`, nullable combat stats `armor_class` / `hp_max` / `hp_current` / `speed` (social NPCs need none), and `srd_reference` naming the SRD stat block to run them as (e.g. `'bandit captain'`) — the real block stays in the SRD/binder. `adventure_id` **nullable**: null = recurring NPC bound to no one adventure. Optional `area_id` = where they are usually found. |
+| `rpg.plot_points` | one story part — `kind` is `hook`\|`scene`\|`event`\|`secret`\|`twist`\|`revelation` | `title`, `body` (what actually happens / what the secret is — GM-facing until revealed), **`status`** — the point of the table: `hidden` (players do not know) → `revealed` (now they do) → `resolved` (played out), default `hidden`. Optional anchors `area_id` / `npc_id`, plus `sort_order`. |
+
+Two verbs carry the one hot live write — the status flip:
+
+| Verb | Behavior |
+|---|---|
+| `rpg.reveal_plot_point(adventure_slug, title)` | Marks the point `revealed` and returns it (body included, now safe to weave in). Bookkeeping only — then narrate it. |
+| `rpg.resolve_plot_point(adventure_slug, title)` | Marks the point `resolved` — played out. Returns the point. |
+
+Both resolve the point by slug + title (case-insensitive), error instructively
+when not found or ambiguous, and return a compact jsonb snapshot
+(`{adventure_slug, title, kind, status, body?, area?, npc?}`). Re-hiding a
+point the players forgot is legitimate and is a plain `UPDATE` on
+`rpg.plot_points` — no verb, by design. Everything else on these three tables
+is ordinary SQL: prep-time inserts, live updates to `visited`, `disposition`,
+`status`, `hp_current`.
 
 ---
 
