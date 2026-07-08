@@ -1140,16 +1140,24 @@ $("#themeBtn").onclick = () => {
 const DICE = [4,6,8,10,12,20,100];
 $("#diceBtns").innerHTML = DICE.map(d=>`<button class="dbtn" data-d="${d}">d${d}</button>`).join("");
 let rolling = false;
+// Honest dice: crypto-random with rejection sampling (no modulo bias).
+// "The dice are public. State what is being rolled... and then live with it."
+function rollDie(sides){
+  const limit = Math.floor(0x100000000 / sides) * sides;
+  const b = new Uint32Array(1);
+  do { crypto.getRandomValues(b); } while (b[0] >= limit);
+  return 1 + (b[0] % sides);
+}
 function roll(sides){
   if(rolling) return; rolling = true;
   const die=$("#rollDie"), label=$("#rollLabel");
   die.className="roll-die roll-rolling"; label.textContent=`rolling d${sides}…`;
   let ticks=0;
   const spin=setInterval(()=>{
-    die.textContent = 1 + Math.floor(Math.abs(Math.sin(ticks*12.9898)*43758.5453)%1*sides);
+    die.textContent = rollDie(sides);
     if(++ticks>10){
       clearInterval(spin);
-      const val = 1 + Math.floor(Math.abs(Math.sin(ticks*78.233 + sides)*43758.5453)%1*sides);
+      const val = rollDie(sides);
       die.textContent = val;
       die.className = "roll-die" + (sides===20&&val===20?" crit":sides===20&&val===1?" fumble":"");
       label.textContent = sides===20&&val===20?"a natural 20 — the bones favour you":sides===20&&val===1?"a natural 1 — the dark laughs":`d${sides} → ${val}`;
