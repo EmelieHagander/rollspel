@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0014_encounter_read_and_player_notes.sql
+-- 0015_encounter_read_and_player_notes.sql
 --
 -- Two webapp features, one migration, all inside schema rpg:
 --
@@ -53,16 +53,17 @@
 begin;
 
 -- ---------------------------------------------------------------------------
--- PART 1: read policies for the combat board
+-- PART 1: combat-board read surface
+--
+-- RENUMBER + TRIM NOTE: authored as 0014, renamed to 0015 after the parallel
+-- workstream's 0014_encounter_board_api_access.sql landed on main first,
+-- carrying the same two SELECT policies (plus a DML revoke and realtime
+-- publication setup). The duplicate CREATE POLICY statements were removed
+-- from this file; what remains here is only this migration's own delta.
+-- Applied to the live vault under the pre-rename name
+-- 0014_encounter_read_and_player_notes (grants + PART 2 only — the policies
+-- already existed live when it was applied).
 -- ---------------------------------------------------------------------------
-
-create policy encounters_api_select on rpg.encounters
-  for select to authenticated
-  using (true);
-
-create policy encounter_combatants_api_select on rpg.encounter_combatants
-  for select to authenticated
-  using (true);
 
 -- No INSERT/UPDATE/DELETE policies: the GM (service_role) runs the verbs.
 
