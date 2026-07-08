@@ -1,5 +1,15 @@
 -- ============================================================================
--- 0005_require_login_revoke_anon.sql
+-- 0008_require_login_revoke_anon.sql
+--
+-- RENUMBERED from 0005 after merging origin/main, whose parallel GM-surface
+-- workstream independently used 0003-0005 (adventures_and_gm_surface /
+-- rpg_api_access / story_beats). Shifted 0005 -> 0008 to resolve the collision
+-- and follow main's history. Already applied live under its short-name 0005;
+-- the renumber is repo ordering only, not a re-apply. The merge also revealed
+-- the `_api_*` policies this file narrows were created by main's
+-- 0004_rpg_api_access.sql. A follow-up (0009_complete_login_lockdown) extends
+-- this same login-required lockdown to the merged GM-surface objects
+-- (story_beats policies, anon default privileges).
 --
 -- Locks the character family to LOGGED-IN users only.
 --
@@ -23,16 +33,17 @@
 --      nothing.
 --
 -- UNCHANGED:
---   * `authenticated` keeps its 0003 grants (usage on schema rpg + table DML)
+--   * `authenticated` keeps its 0006 grants (usage on schema rpg + table DML)
 --     and full read/write through those now-authenticated-only `_api_*`
 --     policies.
 --   * `service_role` (the AI GM's key) is untouched — it bypasses RLS
 --     regardless, so GM writes are unaffected.
 --
--- Note on ownership of the `_api_*` policies: they are PRE-EXISTING and were
--- not created by any migration in this repo (0001 created zero policies). This
--- migration only narrows their role list from {anon, authenticated} to
--- {authenticated}; it does not change their intent (permissive, USING true).
+-- Note on ownership of the `_api_*` policies: authored when their origin was
+-- unknown (0001 created zero policies); the origin/main merge later showed them
+-- to be main's 0004_rpg_api_access.sql. This migration only narrows their role
+-- list from {anon, authenticated} to {authenticated}; it does not change their
+-- intent (permissive, USING true).
 --
 -- Forward-only: lands as a new migration, never an edit to an applied one.
 -- ============================================================================

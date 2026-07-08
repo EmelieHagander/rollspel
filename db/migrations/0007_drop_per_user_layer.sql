@@ -1,20 +1,26 @@
 -- ============================================================================
--- 0004_drop_per_user_layer.sql
+-- 0007_drop_per_user_layer.sql
 --
--- Reverses the per-user scaffolding added in 0003. The project owner has
+-- RENUMBERED from 0004 after merging origin/main, whose parallel GM-surface
+-- workstream independently used 0003-0005 (adventures_and_gm_surface /
+-- rpg_api_access / story_beats). Shifted 0004 -> 0007 to resolve the collision
+-- and follow main's history. Already applied live under its short-name 0004;
+-- the renumber is repo ordering only, not a re-apply.
+--
+-- Reverses the per-user scaffolding added in 0006. The project owner has
 -- chosen a SHARED-ACCESS model over per-row isolation for the character
 -- family: login exists only to view; the AI GM writes as `service_role`
 -- (which bypasses RLS); and general read/write for any logged-in user is
 -- desired. The data is not sensitive, so per-character ownership is not wanted.
 --
--- This migration therefore drops everything 0003 added to enforce ownership:
+-- This migration therefore drops everything 0006 added to enforce ownership:
 --   * the 20 per-user `_own` RLS policies (4 verbs x 5 tables),
 --   * rpg.claim_demo_party() (its EXECUTE grant drops with the function),
 --   * the characters_owner_id_idx index,
 --   * the rpg.characters.owner_id column.
 --
 -- KEPT (deliberately not touched):
---   * The two grants from 0003 —
+--   * The two grants from 0006 —
 --       grant usage on schema rpg to authenticated;
 --       grant select, insert, update, delete on all tables in schema rpg
 --         to authenticated;
@@ -26,21 +32,22 @@
 --     schema/table GRANTs, so it stays blocked regardless of its policy
 --     membership; only `authenticated` (granted above) can use them.
 --
--- OBSERVATION (no action taken here): those `<table>_api_*` policies are
--- PRE-EXISTING — they were not created by any migration in this repo (0001
--- created zero policies). They are left in place because they deliver exactly
--- the shared-access posture the owner wants, but they are flagged here in case
--- the owner ever wants their origin and breadth reviewed.
+-- OBSERVATION: when this file was authored the `<table>_api_*` policies were
+-- of unknown origin (0001 created zero policies). The later merge of
+-- origin/main revealed their source: main's 0004_rpg_api_access.sql created
+-- them as a DELIBERATE open-anon posture. They are left in place here because
+-- they deliver the shared-authenticated access the owner then wanted; a
+-- subsequent migration (0008) narrows them to `authenticated` only.
 --
 -- Net effect: the schema honestly reflects "shared authenticated access, no
 -- per-row ownership." Forward-only: this reversal lands as a new migration,
--- never as an edit to 0003.
+-- never as an edit to 0006.
 -- ============================================================================
 
 begin;
 
 -- ---------------------------------------------------------------------------
--- 1. Drop the 20 per-user `_own` policies from 0003.
+-- 1. Drop the 20 per-user `_own` policies from 0006.
 --    (Must precede dropping owner_id: the characters policies reference it.)
 -- ---------------------------------------------------------------------------
 

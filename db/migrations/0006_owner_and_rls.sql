@@ -1,5 +1,12 @@
 -- ============================================================================
--- 0003_owner_and_rls.sql
+-- 0006_owner_and_rls.sql
+--
+-- RENUMBERED from 0003 after merging origin/main, whose parallel GM-surface
+-- workstream independently used 0003-0005 (0003_adventures_and_gm_surface,
+-- 0004_rpg_api_access, 0005_story_beats). This file and its two successors
+-- were shifted to 0006-0008 to resolve the collision and sit after main's
+-- history. It was already applied live under its original short-name 0003;
+-- the renumber is for repo ordering only, not a re-apply.
 --
 -- Turns on PER-USER access to the character family. The webapp now uses full
 -- login (Supabase Auth); every row belongs to the signed-in user who owns it,
