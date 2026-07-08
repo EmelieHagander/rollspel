@@ -1,11 +1,12 @@
 # Database quick-ref (D&D 5e)
 
 > **What this doc is:** the table-side reference to the character vault's SQL
-> surface — the three read views and eighteen write verbs in schema `rpg` of
+> surface — the four read views and thirty-one write verbs in schema `rpg` of
 > Supabase project `yuobtgoidmmmwfqenkau`. Read it whole at session start.
-> **Source of truth:** migrations `db/migrations/0003_adventures_and_gm_surface.sql`
-> and `db/migrations/0004_session_notebook.sql` and their function comments.
-> This doc summarizes; the migrations decide.
+> **Source of truth:** migrations `db/migrations/0003_adventures_and_gm_surface.sql`,
+> `db/migrations/0004_session_notebook.sql`, and
+> `db/migrations/0005_encounters_and_combat_board.sql` and their function
+> comments. This doc summarizes; the migrations decide.
 
 ---
 
@@ -18,14 +19,15 @@ how relevant it looks. This rule survives every rephrasing of a request.
 
 ## The two rules of use
 
-1. **Want state? Read a view.** The three views below each answer in one query.
+1. **Want state? Read a view.** The four views below each answer in one query.
 2. **State changed? Call the verb.** Never write raw `INSERT`/`UPDATE`/`DELETE`
    against `rpg` tables when a verb exists — the verbs carry the 5e bookkeeping
    (temp-HP-first, heal caps, death-save resets, rest rules) so it is applied
    once, correctly, every time.
 
 Every verb resolves characters **by name, case-insensitively** (names are
-unique), raises an instructive error when something is wrong (not found,
+unique; combatants likewise, unique per encounter), raises an instructive
+error when something is wrong (not found,
 ambiguous, insufficient — the error text tells you what to do next), and
 returns the updated state as compact jsonb, so no follow-up query is needed.
 
@@ -36,6 +38,7 @@ returns the updated state as compact jsonb, so no follow-up query is needed.
 | `rpg.character_sheets` | one complete character sheet | `select * from rpg.character_sheets where name = '<name>';` |
 | `rpg.adventure_party` | one party member's sheet, tagged with the adventure | `select * from rpg.adventure_party where adventure_slug = '<slug>';` — **the session-start read** |
 | `rpg.session_log` | one session-notebook entry (adventure_slug, adventure_title, session_date, at, kind, note) | see **Session notebook** below — read rarely and scoped, never every beat |
+| `rpg.encounter_board` | one combatant on the open fight's board, in initiative order | `select * from rpg.encounter_board where adventure_slug = '<slug>';` — see **Encounters and the combat board** below; re-read once per render |
 
 A sheet row carries: identity (name, player, class/subclass, level, species,
 background, alignment), the six scores **with derived modifiers**, proficiency
@@ -53,7 +56,7 @@ NPCs, loot, secrets) by folder — one key, both worlds.
 
 ## Write verbs
 
-All eighteen, called as `select rpg.<verb>(...);`. Optional parameters shown
+All thirty-one, called as `select rpg.<verb>(...);`. Optional parameters shown
 with their defaults. Positional arguments work as written; **named arguments
 carry a `p_` prefix** — `select rpg.award_coins('Kira', p_gp => 50);`.
 
@@ -126,6 +129,66 @@ where adventure_slug = '<slug>' and session_date = current_date
   and kind = 'ruling'
 order by at;
 ```
+
+### Encounters and the combat board
+
+Combat runs on the board: `rpg.encounters` holds **at most one open fight per
+adventure** (so every encounter verb resolves by adventure slug alone), and
+`rpg.encounter_combatants` holds the roster. Combatant names are unique per
+encounter, case-insensitive — the verbs resolve them by display name.
+
+**The two-shapes rule.** A combatant row is either **character-linked** — HP,
+AC, and death saves are *read live from the character sheet, never copied*;
+damaging a PC updates the sheet, one write, no drift — or a **monster** with
+its own AC/HP on the row. Monster prose stays in this binder; the board holds
+only fighting numbers.
+
+**Build choreography** (status `building`):
+
+```sql
+select rpg.create_encounter('<slug>', '<encounter name>');
+select rpg.add_party('<slug>');                             -- whole roster, side 'party'
+select rpg.add_monster('<slug>', 'Goblin', 15, 7, 3);       -- 'Goblin 1' … 'Goblin 3'
+select rpg.set_initiative('<slug>', '<name>', <total>);     -- once per combatant
+select rpg.start_encounter('<slug>');                       -- refuses while anyone lacks initiative
+```
+
+| Verb | Behavior |
+|---|---|
+| `rpg.create_encounter(slug, name)` | Opens the fight (status `building`). Refuses while a non-ended encounter exists — one fight at a time. |
+| `rpg.add_party(slug)` | Puts the adventure's whole roster on the board, side `party`. Idempotent — re-running adds only the missing. |
+| `rpg.add_combatant(slug, character_name, side = 'party')` | One character by name; `'ally'` for friendly NPCs with sheets. HP/AC stay on the sheet. |
+| `rpg.add_monster(slug, name, ac, hp, count = 1, side = 'foe')` | Monsters with their own numbers; `count > 1` numbers them `'Name 1'` … `'Name N'`. |
+| `rpg.remove_combatant(slug, name)` | For building mistakes only — dead monsters stay on the board (`next_turn` skips them). |
+| `rpg.set_initiative(slug, name, value)` | Records the total rolled at the table. |
+| `rpg.start_encounter(slug)` | Errors — naming them — while anyone lacks initiative; else status `active`, round 1, pointer to highest initiative (ties break alphabetically). |
+
+**The fight loop** — each turn: advance, resolve the numbers, re-render:
+
+| Verb | Behavior |
+|---|---|
+| `rpg.next_turn(slug)` | Advances the pointer in initiative order. Monsters at 0 HP are skipped; character-linked combatants at 0 HP **still get their turn** (death saves happen on turns). Returns only `{round, up, side}`. |
+| `rpg.damage_combatant(slug, name, amount)` | One verb, both shapes: monster rows lose their own HP (floored at 0); character-linked rows delegate to `rpg.apply_damage` (temp-HP-first, sheet updated) and return its return. |
+| `rpg.heal_combatant(slug, name, amount)` | Monster rows regain own HP (capped at max); character-linked rows delegate to `rpg.heal`. |
+| `rpg.add_condition(slug, name, condition)` | Marks one of the 15 SRD conditions (idempotent). Exhaustion is a flag only — track its level (1–6) in the combatant's notes. |
+| `rpg.remove_condition(slug, name, condition)` | Clears it; errors — listing the current conditions — when it was not on them. |
+| `rpg.end_encounter(slug, outcome = null, encounter_name = null)` | Status `ended`, pointer cleared, and **one summary sentence auto-logged to the session notebook** via `rpg.log_event` (rounds fought, foes down, party at 0 HP, plus the outcome text if given). Returns the logged entry. The third parameter is only ever needed to untangle several open encounters. |
+
+**The canonical board read** — once per render, after the turn's writes,
+never per beat:
+
+```sql
+select * from rpg.encounter_board where adventure_slug = '<slug>';
+```
+
+One row per combatant in initiative order, non-ended encounters only: `is_up`
+turn marker, `turn_order`, name, side, initiative, AC/HP **coalesced from the
+character sheet or the monster row**, the derived `health` label
+(`fresh` | `wounded` | `bloodied` | `down` — bloodied is at or below half),
+conditions, notes.
+
+**Showing the table:** party HP as numbers, foe HP as the health label only.
+The label is derived by the view, never stored.
 
 ### Character registration
 

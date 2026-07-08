@@ -151,7 +151,7 @@ mid-scene reader lands on the one page it needs):
 | `rules/dnd5e/srd-combat.md` | SRD quick-ref: combat sequence, actions, cover, movement |
 | `rules/dnd5e/srd-conditions.md` | SRD quick-ref: the conditions, verbatim effects |
 | `rules/dnd5e/srd-checks.md` | SRD quick-ref: ability checks, typical DCs, advantage/disadvantage, contests |
-| `rules/dnd5e/database-quick-ref.md` | The character vault's SQL surface: the three read views, the eighteen write verbs (including the append-only session notebook — `rpg.log_event` / `rpg.session_log`), the `create_character` payload, the slug↔folder join, the `rpg`-schema fence |
+| `rules/dnd5e/database-quick-ref.md` | The character vault's SQL surface: the four read views, the thirty-one write verbs (including the append-only session notebook — `rpg.log_event` / `rpg.session_log` — and the encounter family behind the combat board, `rpg.encounter_board`), the `create_character` payload, the slug↔folder join, the `rpg`-schema fence |
 
 Naming rule for quick-refs: `srd-<topic>.md`. The `srd-` prefix is a
 provenance claim — everything in such a file comes from the 5e SRD
