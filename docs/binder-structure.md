@@ -58,7 +58,9 @@ sessions/
 └── dnd5e/                     ← session logs and recaps, one system per session
 
 prompts/                       ← flat; the system tag lives in the filename
-└── gm-dnd5e.md
+├── gm-dnd5e.md                ← the GM prompt — read by path, mid-session
+├── first-evening-dnd5e.md     ← paste-in for a new table's FIRST evening
+└── every-evening-dnd5e.md     ← paste-in address card for every later evening
 
 docs/                          ← about the repo itself; never system-namespaced
 ```
@@ -105,15 +107,33 @@ one-shot, bound to no world. The pointer lives on the adventure, never the
 reverse: a world doc does not list its adventures — such a list is stale by
 the second one-shot.
 
-## GM prompts
+## Prompts
 
-GM prompts live flat in `prompts/`, one per system, named `gm-<tag>.md`:
+Prompts live flat in `prompts/`, tag in filename. A system's full set is
+**three documents**, split by who reads them and when:
 
-- `prompts/gm-dnd5e.md` — now
-- `prompts/gm-vtm.md`, `prompts/gm-trudvang.md` — when those systems arrive
+| Path | Reader, and when |
+|---|---|
+| `prompts/gm-<tag>.md` | The table-side GPT, by path, every session — the GM prompt itself: who to be and how to run the game. Both cards below point their reader at it. |
+| `prompts/first-evening-<tag>.md` | The owner, once per new table — copied, blanks filled, pasted into a fresh GPT for the **first** evening: session zero (characters created from player info, players rolling their own dice, registration via the vault verbs, dossiers) plus the first adventure's kickoff. |
+| `prompts/every-evening-<tag>.md` | The owner, every **later** evening — the address card: where the binder and vault are, how to get in, what tonight's adventure and table are. |
 
-One file per system does not earn a subfolder. If a system ever needs several
-prompt variants, that system gets `prompts/<tag>/` and this map is updated first.
+The two cards are the owner's paste-in templates and answer one question —
+*which do I paste tonight?* — by name alone: first evening, `first-evening-`;
+any other evening, `every-evening-`. Each card is self-contained (a first
+evening does not also need the address card). For D&D 5e:
+
+- `prompts/gm-dnd5e.md`, `prompts/first-evening-dnd5e.md`,
+  `prompts/every-evening-dnd5e.md` — now
+- the `vtm` and `trudvang` trios — when those systems arrive
+
+*(History: `every-evening-dnd5e.md` was born `prompts/first-contact.md` and was
+`git mv`'d when the true first-evening document arrived and took the "first"
+name with better claim.)*
+
+Three named files per system do not earn a subfolder. If a system ever
+outgrows its trio, that system gets `prompts/<tag>/` and this map is updated
+first.
 
 ## The reference library the GM prompt cites
 
