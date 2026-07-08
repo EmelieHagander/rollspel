@@ -112,8 +112,22 @@ GM prompts live flat in `prompts/`, one per system, named `gm-<tag>.md`:
 - `prompts/gm-dnd5e.md` — now
 - `prompts/gm-vtm.md`, `prompts/gm-trudvang.md` — when those systems arrive
 
+**A GM prompt is one document: charter and runtime protocol together.** The
+prompt has two natures — who the GM is (soul, law, craft) and how it operates
+turn by turn (turn loop, tool behavior, state read/write, secret visibility,
+recap/save). Both instruct the same reader in the same session, so they travel
+in the same file: the table-side GPT is handed exactly one path at session
+start, has no search, and a companion file it must remember to fetch mid-scene
+is a document lost, politely. For 5e, the runtime protocol's address is the
+**reserved section `# Runtime protocol` inside `prompts/gm-dnd5e.md`** —
+reserved in the map's usual sense: the address is ruled here, the content is
+authored elsewhere (prompt content goes through Douglas, CLAUDE.md §4.2).
+
 One file per system does not earn a subfolder. If a system ever needs several
-prompt variants, that system gets `prompts/<tag>/` and this map is updated first.
+prompt *variants* — genuinely alternative prompts for the same seat, not
+chapters of one prompt — that system gets `prompts/<tag>/` and this map is
+updated first. A runtime protocol is a chapter, never a variant; it does not
+trigger the migration.
 
 ## The reference library the GM prompt cites
 
@@ -137,7 +151,7 @@ mid-scene reader lands on the one page it needs):
 | `rules/dnd5e/srd-combat.md` | SRD quick-ref: combat sequence, actions, cover, movement |
 | `rules/dnd5e/srd-conditions.md` | SRD quick-ref: the conditions, verbatim effects |
 | `rules/dnd5e/srd-checks.md` | SRD quick-ref: ability checks, typical DCs, advantage/disadvantage, contests |
-| `rules/dnd5e/database-quick-ref.md` | The database's SQL surface: the character vault (read views, write verbs, the `create_character` payload), the public story stream and private GM log, the GM prep layer (areas, NPCs, plot points and their lifecycle verbs), the slug↔folder join, the `rpg`-schema fence |
+| `rules/dnd5e/database-quick-ref.md` | The database's SQL surface: the character vault (read views, write verbs, the `create_character` payload), the session notebook, the combat board (`rpg.encounter_board`), the public story stream and private GM log, the GM prep layer (areas, NPCs, plot points and their lifecycle verbs), the slug↔folder join, the `rpg`-schema fence |
 
 Naming rule for quick-refs: `srd-<topic>.md`. The `srd-` prefix is a
 provenance claim — everything in such a file comes from the 5e SRD
