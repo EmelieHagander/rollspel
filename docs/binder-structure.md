@@ -116,7 +116,7 @@ Prompts live flat in `prompts/`, tag in filename. A system's full set is
 | Path | Reader, and when |
 |---|---|
 | `prompts/gm-<tag>.md` | The table-side GPT, by path, every session — the GM prompt itself: who to be and how to run the game. Both evening cards point their reader at it. |
-| `prompts/first-evening-<tag>.md` | The owner, once per new table — copied, blanks filled, pasted into a fresh GPT for the **first** evening: session zero (characters created from player info, players rolling their own dice, registration via the vault verbs, dossiers) plus the first adventure's kickoff. |
+| `prompts/first-evening-<tag>.md` | The owner, once per new table — copied, blanks filled, pasted into a fresh GPT for the **first** evening: the story kickoff, nothing more. The characters are already forged — that is the workshop card's work, done before game night — so this card connects binder and vault, verifies the table is ready (roster check against the vault; a forged-but-unattached character is attached; a character missing from the vault is **not** built tonight — the owner is sent to the workshop card and play proceeds with who is present), then opens the adventure as the GM prompt directs. |
 | `prompts/every-evening-<tag>.md` | The owner, every **later** evening — the address card: where the binder and vault are, how to get in, what tonight's adventure and table are. |
 | `prompts/character-creation-<tag>.md` | The owner and a player, **any time — no evening required**. Pasted into a fresh GPT, it is a standalone character-creation helper — **not a GM**, bound to no session: it builds characters at the player's pace (however many questions that takes), answers the system's rules questions along the way, saves finished characters to the vault, and files their binder dossiers. Self-contained; it never points at the GM prompt. |
 
@@ -128,9 +128,7 @@ just a character to build, `character-creation-`. Each is self-contained
 character workshop needs no evening card at all). For D&D 5e:
 
 - `prompts/gm-dnd5e.md`, `prompts/first-evening-dnd5e.md`,
-  `prompts/every-evening-dnd5e.md` — now
-- `prompts/character-creation-dnd5e.md` — reserved: the address is ruled
-  here, the content is Douglas's (CLAUDE.md §4.2)
+  `prompts/every-evening-dnd5e.md`, `prompts/character-creation-dnd5e.md` — now
 - the `vtm` and `trudvang` quartets — when those systems arrive
 
 *(History: `every-evening-dnd5e.md` was born `prompts/first-contact.md` and was
