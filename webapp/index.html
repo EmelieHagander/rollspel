@@ -255,6 +255,8 @@ button { font-family: inherit; cursor: pointer; }
 .coin .disc { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-family: var(--mono); font-size: .56rem; font-weight: 700; color: #201607; }
 .coin .amt { font-family: var(--mono); font-weight: 600; font-size: .85rem; }
 .coin .cn { font-family: var(--mono); font-size: .58rem; color: var(--ink-faint); text-transform: uppercase; }
+.coin .cbtn { width: 22px; height: 22px; border-radius: 7px; border: 1px solid var(--line); background: var(--panel); color: var(--ink-dim); font-weight: 700; line-height: 1; padding: 0; }
+.coin .cbtn:hover { color: var(--gold); border-color: var(--violet-dim); }
 
 .scene { position: relative; padding: 0 0 4px 30px; }
 .scene::before { content: ""; position: absolute; left: 8px; top: 4px; bottom: 0; width: 2px; background: linear-gradient(var(--violet-dim), transparent); }
@@ -510,7 +512,7 @@ button { font-family: inherit; cursor: pointer; }
             </div>
           </div>
           <div class="card">
-            <div class="card-t">Purse <span class="rule"></span></div>
+            <div class="card-t">Purse <span class="rule"></span><button class="mini-btn" id="coinEdit">adjust</button></div>
             <div class="coins" id="coins"></div>
           </div>
         </div>
@@ -1023,8 +1025,17 @@ function renderSheet() {
   const coinMeta = {pp:["#e6e8ec","PP"],gp:["#e8c14e","GP"],ep:["#c7cdb0","EP"],sp:["#cfd4da","SP"],cp:["#c8875a","CP"]};
   $("#coins").innerHTML = ["pp","gp","ep","sp","cp"].map(k=>{
     const [col,lab]=coinMeta[k];
-    return `<div class="coin"><span class="disc" style="background:radial-gradient(circle at 35% 30%, #fff8, ${col})">${lab[0]}</span><span class="amt">${c.coins[k]}</span><span class="cn">${lab}</span></div>`;
+    const steppers = coinEditMode
+      ? `<button class="cbtn" data-k="${k}" data-d="-1" aria-label="spend 1 ${lab}">−</button><button class="cbtn" data-k="${k}" data-d="1" aria-label="gain 1 ${lab}">+</button>`
+      : "";
+    return `<div class="coin"><span class="disc" style="background:radial-gradient(circle at 35% 30%, #fff8, ${col})">${lab[0]}</span><span class="amt">${c.coins[k]}</span><span class="cn">${lab}</span>${steppers}</div>`;
   }).join("");
+  $("#coins").querySelectorAll(".cbtn").forEach(b=>b.onclick=()=>{
+    const k=b.dataset.k, d=+b.dataset.d;
+    c.coins[k] = Math.max(0, c.coins[k] + d);
+    renderSheet();
+    persist(c, { ["coins_"+k]: c.coins[k] });
+  });
 
   $("#abilities").innerHTML = ABILS.map(a=>{
     const k = a.slice(0,3), isSave = c.saves.includes(a);
@@ -1189,13 +1200,14 @@ function renderAdvParty(links) {
 }
 function advStartPoll() {
   advStopPoll();
-  if (!(LIVE && !demoMode) || !ADV.id) return;
+  if (!(LIVE && !demoMode)) return;
   ADV.timer = setInterval(() => {
     if (document.visibilityState !== "visible") return;
-    if ($("#view-story").classList.contains("on")) loadAdventureContent().catch(() => {});
-    else if ($("#view-enc").classList.contains("on")) loadBoard().catch(() => {});
+    if ($("#view-story").classList.contains("on") && ADV.id) loadAdventureContent().catch(() => {});
+    else if ($("#view-enc").classList.contains("on") && ADV.id) loadBoard().catch(() => {});
+    else if ($("#view-sheet").classList.contains("on")) refreshVitals().catch(() => {});
   }, 12000);
-  $("#advLivePill").style.display = "";
+  $("#advLivePill").style.display = ADV.id ? "" : "none";
 }
 function advStopPoll() {
   if (ADV.timer) { clearInterval(ADV.timer); ADV.timer = null; }
@@ -1335,6 +1347,46 @@ function renderNotes() {
 
 function renderAll(){ renderSwitcher(); renderSheet(); renderStory(); renderEnc(); renderNotes(); }
 
+/* ===================== PURSE ===================== */
+let coinEditMode = false;
+$("#coinEdit").onclick = () => {
+  coinEditMode = !coinEditMode;
+  $("#coinEdit").textContent = coinEditMode ? "done" : "adjust";
+  renderSheet();
+};
+
+/* ===================== VAULT REFRESH (sheet stays honest between devices) =====================
+   The GM and other players write the vault too; re-read the live numbers
+   (HP, coins, death saves, hit dice, slots) and fold them in. */
+async function refreshVitals() {
+  if (!(LIVE && !demoMode) || !PARTY.length || !sb) return;
+  const ids = PARTY.map(p => p.dbId).filter(Boolean);
+  if (!ids.length) return;
+  const [chars, slots] = await Promise.all([
+    sb.schema(RPG).from("characters").select("*").in("id", ids),
+    sb.schema(RPG).from("character_spell_slots").select("*").in("character_id", ids)
+  ]);
+  if (chars.error || slots.error) return;
+  (chars.data || []).forEach(r => {
+    const p = PARTY.find(x => x.dbId === r.id); if (!p) return;
+    Object.assign(p, {
+      level: r.level, ac: r.armor_class, speed: r.speed,
+      hpMax: r.hp_max, hpCur: r.hp_current, hpTemp: r.hp_temp,
+      hdTotal: r.hit_dice_total, hdRem: r.hit_dice_remaining,
+      deathS: r.death_save_successes, deathF: r.death_save_failures,
+      coins: { cp: r.coins_cp, sp: r.coins_sp, ep: r.coins_ep, gp: r.coins_gp, pp: r.coins_pp }
+    });
+    p.slots = (slots.data || []).filter(s => s.character_id === r.id)
+      .map(s => ({ kind: s.slot_kind, level: s.slot_level, total: s.slots_total, used: s.slots_expended }))
+      .sort((a, b) => a.kind === b.kind ? a.level - b.level : a.kind.localeCompare(b.kind));
+  });
+  // don't clobber a field the player is mid-typing in
+  const typing = document.activeElement &&
+    /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName) &&
+    $("#view-sheet").contains(document.activeElement);
+  if ($("#view-sheet").classList.contains("on") && !typing) renderSheet();
+}
+
 /* ===================== HP controls ===================== */
 $("#btnDmg").onclick = () => {
   const c=current, amt=Math.max(0, +$("#hpAmt").value||0);
@@ -1360,6 +1412,7 @@ document.querySelectorAll(".navbtn[data-view]").forEach(b=>b.onclick=()=>{
     if (b.dataset.view === "enc") loadBoard().catch(() => {});
     else if (b.dataset.view === "story" && ADV.id) loadAdventureContent().catch(() => {});
     else if (b.dataset.view === "notes") loadNotes().catch(() => {});
+    else if (b.dataset.view === "sheet") refreshVitals().catch(() => {});
   }
 });
 
@@ -1433,7 +1486,8 @@ async function enterLive(email){
     advPickRender();
     renderAll(); showApp();
     loadNotes().catch(()=>{});
-    if (ADV.id) { loadAdventureContent().catch(()=>{}); loadBoard().catch(()=>{}); advStartPoll(); }
+    if (ADV.id) { loadAdventureContent().catch(()=>{}); loadBoard().catch(()=>{}); }
+    advStartPoll();   // polls whichever live tab is visible, sheet included
     if(!party.length) toast("Signed in — your vault is empty, ready for a real party");
   } catch (e) {
     const msg = (e && (e.message || e.hint || e.details)) || String(e);
