@@ -377,6 +377,24 @@ button.tag:hover { border-color: var(--violet-dim); }
 .foot { padding: 22px 26px 30px; color: var(--ink-faint); font-size: .76rem; font-family: var(--mono); border-top: 1px solid var(--line-soft); max-width: 1180px; }
 .foot b { color: var(--violet); font-weight: 600; }
 
+/* how-to prose (rendered binder markdown) */
+.prose { max-width: 74ch; padding: 26px 30px; }
+.prose h2, .prose h3, .prose h4 { font-family: var(--serif); margin: 22px 0 8px; }
+.prose h2:first-child { margin-top: 0; }
+.prose h2 { font-size: 1.35rem; color: var(--gold-soft); }
+.prose h3 { font-size: 1.1rem; }
+.prose p { margin: 0 0 12px; color: var(--ink-dim); font-size: .95rem; max-width: 68ch; }
+.prose ul, .prose ol { margin: 0 0 12px; padding-left: 22px; color: var(--ink-dim); font-size: .95rem; }
+.prose li { margin: 4px 0; }
+.prose code { font-family: var(--mono); font-size: .82em; background: var(--bg-2); border: 1px solid var(--line-soft); border-radius: 6px; padding: 1px 6px; }
+.prose pre { background: var(--bg-2); border: 1px solid var(--line-soft); border-radius: 10px; padding: 12px 14px; overflow-x: auto; margin: 0 0 12px; }
+.prose pre code { background: none; border: none; padding: 0; font-size: .8rem; color: var(--ink-dim); }
+.prose blockquote { margin: 0 0 12px; padding: 8px 16px; border-left: 3px solid var(--violet-dim); background: var(--bg-2); border-radius: 0 10px 10px 0; font-family: var(--serif); font-style: italic; }
+.prose blockquote p { margin: 4px 0; }
+.prose hr { border: none; height: 1px; background: linear-gradient(90deg, var(--line), transparent); margin: 20px 0; }
+.prose a { color: var(--violet); }
+.prose a:hover { color: var(--gold); }
+
 /* ===================== MOBILE ===================== */
 @media (max-width: 780px) {
   /* the fixed two-column grids collapse to a single column
@@ -454,6 +472,10 @@ button.tag:hover { border-color: var(--violet-dim); }
       <span class="tip">Field notes</span>
     </button>
     <div class="spacer"></div>
+    <button class="navbtn" data-view="howto" aria-label="How to run an evening">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 6c-1.5-1.4-3.6-2-6-2H4v14h2c2.4 0 4.5.6 6 2 1.5-1.4 3.6-2 6-2h2V4h-2c-2.4 0-4.5.6-6 2z"/><path d="M12 6v14"/></svg>
+      <span class="tip">How to run an evening</span>
+    </button>
     <button class="navbtn" id="themeBtn" aria-label="Toggle light or dark">
       <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
       <span class="tip">Candle / daylight</span>
@@ -674,6 +696,16 @@ button.tag:hover { border-color: var(--violet-dim); }
         <span class="local-note" id="notesLocalNote">◈ offline preview — sign in and your notes live in the vault, visible only to you</span>
       </div>
       <div class="notes-grid" id="notes"></div>
+    </section>
+
+    <!-- ===== HOW-TO ===== -->
+    <section class="view" id="view-howto">
+      <div class="view-head">
+        <span class="eyebrow">the binder · docs/how-to-run-an-evening.md</span>
+        <h2>How to run an evening</h2>
+        <p>The table's own manual — read live from the campaign binder.</p>
+      </div>
+      <div class="card prose" id="howtoBody"></div>
     </section>
 
     <footer class="foot">
@@ -1587,12 +1619,67 @@ $("#btnHeal").onclick = () => {
   persist(c,{hp_current:c.hpCur});
 };
 
+/* ===================== HOW-TO (binder page, fetched live from the repo) ===================== */
+const HOWTO_URL = "https://raw.githubusercontent.com/EmelieHagander/rollspel/main/docs/how-to-run-an-evening.md";
+let howtoLoaded = false;
+function mdRender(md) {
+  const escMd = s => s.replace(/[&<>"]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]));
+  const inline = s => s
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*([^*]+)\*/g, "<em>$1</em>")
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, t, u) => /^https?:/.test(u) ? `<a href="${u}" target="_blank" rel="noopener">${t}</a>` : t);
+  const lines = md.replace(/\r/g, "").split("\n");
+  let html = "", inCode = false, listType = null, inQuote = false;
+  const closeList = () => { if (listType) { html += `</${listType}>`; listType = null; } };
+  const closeQuote = () => { if (inQuote) { html += "</blockquote>"; inQuote = false; } };
+  for (const line of lines) {
+    if (line.startsWith("```")) { closeList(); closeQuote(); html += inCode ? "</code></pre>" : "<pre><code>"; inCode = !inCode; continue; }
+    if (inCode) { html += escMd(line) + "\n"; continue; }
+    const h = line.match(/^(#{1,4})\s+(.*)/);
+    if (h) { closeList(); closeQuote(); const lv = Math.min(4, h[1].length + 1); html += `<h${lv}>${inline(escMd(h[2]))}</h${lv}>`; continue; }
+    if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) { closeList(); closeQuote(); html += "<hr>"; continue; }
+    const ul = line.match(/^\s*[-*]\s+(.*)/), ol = line.match(/^\s*\d+\.\s+(.*)/);
+    if (ul || ol) {
+      closeQuote();
+      const t = ul ? "ul" : "ol";
+      if (listType !== t) { closeList(); html += `<${t}>`; listType = t; }
+      html += `<li>${inline(escMd((ul || ol)[1]))}</li>`; continue;
+    }
+    const q = line.match(/^>\s?(.*)/);
+    if (q) { closeList(); if (!inQuote) { html += "<blockquote>"; inQuote = true; } html += `<p>${inline(escMd(q[1]))}</p>`; continue; }
+    if (!line.trim()) { closeList(); closeQuote(); continue; }
+    closeList(); closeQuote();
+    html += `<p>${inline(escMd(line))}</p>`;
+  }
+  closeList(); closeQuote(); if (inCode) html += "</code></pre>";
+  return html;
+}
+async function loadHowto(force) {
+  if (howtoLoaded && !force) return;
+  const host = $("#howtoBody");
+  host.innerHTML = `<p style="color:var(--ink-faint)">Fetching the binder page…</p>`;
+  try {
+    const res = await fetch(HOWTO_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const text = await res.text();
+    host.innerHTML = mdRender(text);
+    howtoLoaded = true;
+  } catch (e) {
+    howtoLoaded = false;
+    host.innerHTML = `<p style="color:var(--ink-dim)">The binder page couldn't be reached from here` +
+      (location.protocol === "file:" ? " (offline preview)" : "") +
+      `. It lives at <code>docs/how-to-run-an-evening.md</code> in the repository — and this tab will show it as soon as it can be fetched.</p>`;
+  }
+}
+
 /* ===================== NAV ===================== */
 document.querySelectorAll(".navbtn[data-view]").forEach(b=>b.onclick=()=>{
   document.querySelectorAll(".navbtn[data-view]").forEach(x=>x.classList.remove("active"));
   b.classList.add("active");
   document.querySelectorAll(".view").forEach(v=>v.classList.remove("on"));
   $("#view-"+b.dataset.view).classList.add("on");
+  if (b.dataset.view === "howto") loadHowto();   // binder page: public, works in any mode
   // entering a live tab refreshes it immediately (the poll keeps it fresh after)
   if (LIVE && !demoMode) {
     if (b.dataset.view === "enc") loadBoard().catch(() => {});
