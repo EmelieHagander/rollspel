@@ -64,6 +64,7 @@ prompts/                       ← flat; the system tag lives in the filename
 └── character-creation-dnd5e.md ← paste-in character workshop, any day, no evening
 
 docs/                          ← about the repo itself; never system-namespaced
+└── how-to-run-an-evening.md   ← the owner's guide to the paste-in cards (webapp renders it)
 ```
 
 Why not per-system top-level trees (`dnd5e/rules/…`)? Two reasons, both the
@@ -100,6 +101,17 @@ gets `worlds/<tag>/`, each world becomes one file named for itself —
 `worlds/<tag>/<kebab-world-name>.md` — and the incumbent is `git mv`'d to its
 named address with every citation (the GM prompt, adventures' `World:` lines)
 updated in the same commit. Until that day, nothing under `worlds/` is a folder.
+
+**The image style lives inside the world doc.** Every session-image prompt
+starts from one standard style paragraph — the world's visual register, kept
+in one place so all adventure images share one look. Its address is the
+**reserved section `# Image style` inside `worlds/dnd5e.md`** — reserved in
+the map's usual sense: the address is ruled here, the content is authored by
+the owner/main session (it is game content, world-bound visual direction).
+The GM prompt cites this address; the reader already holds the world doc when
+it composes image prompts at close. If a system ever graduates to
+`worlds/<tag>/`, each world file carries its own `# Image style` section —
+the look belongs to the world, so it travels with the world.
 
 **How adventures relate to a world:** an adventure set in a world declares it
 with a `World:` line at the top of its hook document, citing the exact path —
@@ -158,6 +170,25 @@ stands: the day the flat shelf stops answering *which do I paste?* by name
 alone, that system graduates to `prompts/<tag>/`, this map updates first,
 and every citation moves in the same commit. A runtime protocol is a
 chapter, never a variant or a seat; it triggers nothing.
+
+**The close-down snippet is not a fifth card — ruled 2026-07-09.** The
+closing ritual lives inside `prompts/gm-dnd5e.md` and the GM runs it
+unprompted; the owner's "we're stopping tonight" nudge is one or two
+sentences with no blanks, no key, and no addresses. What earns an evening
+card its file is being a fill-the-blanks template; a two-sentence spoken
+line filed beside them would read as a rival evening card and blur *which
+do I paste?*. It therefore lives **inline in
+`docs/how-to-run-an-evening.md`**, as a quoted snippet at the moment the
+owner needs it — its spot is reserved there for **Douglas** to author
+(prompt text goes through Douglas, CLAUDE.md §4.2). If the snippet ever
+grows blanks or a key, it has become a template and graduates to
+`prompts/close-evening-<tag>.md`, this map updating first.
+
+**The owner's guide to the cards** is `docs/how-to-run-an-evening.md` —
+one page, human-facing (the owner's webapp renders it by that stable
+address), answering *which card do I paste, when?* and carrying the
+close-down snippet above. It points at the cards; the cards never point
+back at it, and the table-side GPT never reads it.
 
 ## The reference library the GM prompt cites
 
