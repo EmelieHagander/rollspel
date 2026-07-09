@@ -352,6 +352,22 @@ button.tag:hover { border-color: var(--violet-dim); }
 .roll-log { margin-top: 10px; max-height: 90px; overflow-y: auto; font-family: var(--mono); font-size: .72rem; color: var(--ink-faint); border-top: 1px solid var(--line-soft); padding-top: 8px; }
 .roll-log div { padding: 2px 0; }
 
+/* moments gallery */
+.moments { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
+.moments:empty { display: none; }
+.moment { position: relative; aspect-ratio: 1; border-radius: 10px; border: 1px solid var(--line); background: var(--bg-2) center / cover no-repeat; cursor: zoom-in; overflow: hidden; transition: transform .12s, border-color .15s; }
+.moment:hover { transform: translateY(-2px); border-color: var(--gold); }
+.moment.loading { display: grid; place-items: center; color: var(--ink-faint); font-family: var(--mono); font-size: .6rem; cursor: default; }
+.moment .mdel { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border-radius: 6px; border: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 78%, transparent); color: var(--ink-dim); font-size: .65rem; line-height: 1; opacity: 0; transition: opacity .15s; }
+.moment:hover .mdel { opacity: 1; }
+.moment .mdel:hover { color: var(--blood); border-color: var(--blood); }
+.moment-add { display: flex; gap: 8px; }
+.moment-add input[type="text"], .moment-add input:not([type]) { flex: 1; min-width: 0; background: var(--bg-2); border: 1px solid var(--line); color: var(--ink); border-radius: 9px; padding: 8px 10px; font-size: .84rem; }
+.lightbox { position: fixed; inset: 0; z-index: 60; display: none; place-items: center; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(8px); cursor: zoom-out; padding: 24px; }
+.lightbox.on { display: grid; animation: fade .2s ease; }
+.lightbox img { max-width: min(94vw, 1100px); max-height: 82vh; border-radius: 14px; border: 1px solid var(--line); box-shadow: var(--shadow); }
+.lightbox .cap { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); max-width: 80vw; text-align: center; font-family: var(--serif); font-style: italic; color: var(--ink); font-size: 1.05rem; text-shadow: 0 2px 12px var(--bg); }
+
 /* transient save toast */
 .toast { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(20px); z-index: 40; background: var(--panel); border: 1px solid var(--line); color: var(--ink); padding: 9px 16px; border-radius: 11px; box-shadow: var(--shadow); font-size: .82rem; font-family: var(--mono); opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s; display: flex; align-items: center; gap: 8px; }
 .toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
@@ -577,6 +593,15 @@ button.tag:hover { border-color: var(--violet-dim); }
               <div class="list" id="advParty"></div>
             </div>
             <div class="card">
+              <div class="card-t">Moments <span class="rule"></span></div>
+              <div class="moments" id="moments"></div>
+              <div class="moment-add">
+                <input id="momentCaption" placeholder="A line for the moment (optional)" maxlength="140" />
+                <button class="btn" id="momentAdd" style="white-space:nowrap">＋ Add image</button>
+                <input type="file" id="momentFile" accept="image/*" hidden />
+              </div>
+            </div>
+            <div class="card">
               <div class="card-t">The GM's ledger <span class="rule"></span></div>
               <p style="color:var(--ink-faint);font-size:.8rem;margin:0">Rulings, threads and secrets-in-motion live in the GM's private log — revealed at the table, not on this page. Secrets are treasure, not narration.</p>
             </div>
@@ -667,6 +692,7 @@ button.tag:hover { border-color: var(--violet-dim); }
 </div>
 
 <div class="toast" id="toast"><span class="dotk"></span><span id="toastMsg"></span></div>
+<div class="lightbox" id="lightbox"><img id="lightboxImg" alt="Session moment" /><div class="cap" id="lightboxCap"></div></div>
 
 <!-- Supabase client. Blocked by the Artifact sandbox's CSP (that's fine — the
      page detects its absence and runs in demo mode). Loads normally when the
@@ -923,20 +949,27 @@ function paintCrest(el, c) {
   });
 }
 /* --- art upload: click the frame, image is downscaled client-side and kept in the vault --- */
-function downscaleImage(file) {
+function downscaleImage(file, maxDim = 512, quality = 0.85) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
       URL.revokeObjectURL(url);
-      const s = Math.min(1, 512 / Math.max(img.width, img.height));
-      const cv = document.createElement("canvas");
-      cv.width = Math.max(1, Math.round(img.width * s));
-      cv.height = Math.max(1, Math.round(img.height * s));
-      cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
-      let out = cv.toDataURL("image/webp", 0.85);
-      if (!out.startsWith("data:image/webp")) out = cv.toDataURL("image/jpeg", 0.85);
-      resolve(out);
+      const encode = (dim, q) => {
+        const s = Math.min(1, dim / Math.max(img.width, img.height));
+        const cv = document.createElement("canvas");
+        cv.width = Math.max(1, Math.round(img.width * s));
+        cv.height = Math.max(1, Math.round(img.height * s));
+        cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+        let out = cv.toDataURL("image/webp", q);
+        if (!out.startsWith("data:image/webp")) out = cv.toDataURL("image/jpeg", q);
+        return out;
+      };
+      // step down until it fits the vault's 900k cap
+      let out = encode(maxDim, quality);
+      const ladder = [[maxDim, quality - 0.15], [Math.round(maxDim * 0.8), 0.6], [Math.round(maxDim * 0.6), 0.55]];
+      for (let i = 0; out.length > 880000 && i < ladder.length; i++) out = encode(ladder[i][0], ladder[i][1]);
+      out.length > 880000 ? reject(new Error("image too heavy even after shrinking")) : resolve(out);
     };
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("not an image the frame understands")); };
     img.src = url;
@@ -1202,7 +1235,72 @@ async function loadAdventureContent() {
   ]);
   renderBeats((beats.data || []).reverse());
   renderAdvParty(links.data || []);
+  loadMoments().catch(() => {});   // gallery is optional: degrades to an empty card
 }
+
+/* ===================== MOMENTS (rpg.adventure_images — session images for the table) ===================== */
+const MOM = { rows: [], cache: new Map(), fetching: new Set() };
+async function loadMoments() {
+  if (!ADV.id) { MOM.rows = []; renderMoments(); return; }
+  // metadata only per tick; heavy payloads fetched once and cached
+  const { data, error } = await sb.schema(RPG).from("adventure_images")
+    .select("id, caption, created_at").eq("adventure_id", ADV.id)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  MOM.rows = data || [];
+  renderMoments();
+  for (const r of MOM.rows) {
+    if (MOM.cache.has(r.id) || MOM.fetching.has(r.id)) continue;
+    MOM.fetching.add(r.id);
+    try {
+      const { data: full, error: e2 } = await sb.schema(RPG).from("adventure_images")
+        .select("data_url").eq("id", r.id).limit(1);
+      if (!e2 && full && full[0]) { MOM.cache.set(r.id, full[0].data_url); renderMoments(); }
+    } finally { MOM.fetching.delete(r.id); }
+  }
+}
+function renderMoments() {
+  const host = $("#moments");
+  host.innerHTML = MOM.rows.map(r => {
+    const url = MOM.cache.get(r.id);
+    return url
+      ? `<div class="moment" data-id="${r.id}" style="background-image:url('${url}')" title="${esc(r.caption)}"><button class="mdel" data-id="${r.id}" aria-label="Remove image">✕</button></div>`
+      : `<div class="moment loading">…</div>`;
+  }).join("");
+  host.querySelectorAll(".moment[data-id]").forEach(m => m.onclick = (e) => {
+    if (e.target.classList.contains("mdel")) return;
+    const r = MOM.rows.find(x => x.id === m.dataset.id);
+    $("#lightboxImg").src = MOM.cache.get(m.dataset.id) || "";
+    $("#lightboxCap").textContent = r ? r.caption : "";
+    $("#lightbox").classList.add("on");
+  });
+  host.querySelectorAll(".mdel").forEach(b => b.onclick = (e) => {
+    e.stopPropagation();
+    sb.schema(RPG).from("adventure_images").delete().eq("id", b.dataset.id)
+      .then(({error}) => { if (error) throw error; MOM.cache.delete(b.dataset.id); return loadMoments(); })
+      .catch(err => toast("Couldn't remove the moment: " + (err.message || err), true));
+  });
+}
+$("#lightbox").onclick = () => $("#lightbox").classList.remove("on");
+document.addEventListener("keydown", e => { if (e.key === "Escape") $("#lightbox").classList.remove("on"); });
+$("#momentAdd").onclick = () => {
+  if (!ADV.id) { toast("Pick an adventure first — moments belong to a story", true); return; }
+  $("#momentFile").click();
+};
+$("#momentFile").onchange = async () => {
+  const f = $("#momentFile").files[0]; $("#momentFile").value = "";
+  if (!f || !ADV.id) return;
+  try {
+    const dataUrl = await downscaleImage(f, 1200, 0.82);
+    const { error } = await sb.schema(RPG).from("adventure_images").insert({
+      adventure_id: ADV.id, caption: $("#momentCaption").value.trim(), data_url: dataUrl, created_by: USER_ID
+    });
+    if (error) throw error;
+    $("#momentCaption").value = "";
+    toast("Moment shared with the table");
+    await loadMoments();
+  } catch (err) { toast("The gallery refused it: " + (err.message || err), true); }
+};
 let BEAT_DESC = localStorage.getItem("codex-beat-order") === "desc";
 let LAST_BEATS = [];
 function beatSortLabel() {
