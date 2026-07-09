@@ -88,7 +88,7 @@ Structurally, a world is **one document**.
 While a system has **one** world, its world doc lives flat on the shelf, tag
 in filename, exactly like the GM prompts:
 
-- `worlds/dnd5e.md` — now (reserved until the owner writes it)
+- `worlds/dnd5e.md` — now (exists, `# Image style` included)
 - `worlds/vtm.md`, `worlds/trudvang.md` — when those systems arrive with a world
 
 The address is deliberately independent of the world's proper name: the

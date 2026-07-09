@@ -60,9 +60,9 @@ just tell the GM. It knows the full closing ritual and runs it by itself:
 it saves the story's state, writes its own hand-over, and delivers the
 evening's image prompts. If you want a ready-made line, paste this:
 
-> *(Close-down snippet — reserved. This prompt text is authored by Douglas,
-> per CLAUDE.md §4.2, and will appear here. Until then, plain words work:
-> tell the GM you're done for tonight, and it will close the books.)*
+> We're stopping here for tonight. Close the books: run your full closing
+> ritual from `prompts/gm-dnd5e.md`, every step in order — it handles a pause
+> and a finished adventure alike. Say goodnight when the last step is confirmed.
 
 Once the GM says goodnight, the chat can be closed and forgotten. Next
 game night, the every-evening card picks the story up exactly where it
