@@ -579,6 +579,7 @@ button.tag:hover { border-color: var(--violet-dim); }
           <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
             <select id="advPick" style="flex:1;min-width:220px;background:var(--bg-2);border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:11px 12px;font-family:var(--sans);font-size:.92rem"></select>
             <button class="btn" id="advRefresh">↻ Refresh</button>
+            <button class="btn btn-gold" style="width:auto;margin:0;padding:10px 14px" id="momentAddTop">📷 ＋ Moment</button>
             <span class="pill live" id="advLivePill" style="display:none">streaming</span>
           </div>
         </div>
@@ -589,10 +590,6 @@ button.tag:hover { border-color: var(--violet-dim); }
           </div>
           <div class="grid" style="gap:16px">
             <div class="card">
-              <div class="card-t">The party <span class="rule"></span></div>
-              <div class="list" id="advParty"></div>
-            </div>
-            <div class="card">
               <div class="card-t">Moments <span class="rule"></span></div>
               <div class="moments" id="moments"></div>
               <div class="moment-add">
@@ -600,6 +597,10 @@ button.tag:hover { border-color: var(--violet-dim); }
                 <button class="btn" id="momentAdd" style="white-space:nowrap">＋ Add image</button>
                 <input type="file" id="momentFile" accept="image/*" hidden />
               </div>
+            </div>
+            <div class="card">
+              <div class="card-t">The party <span class="rule"></span></div>
+              <div class="list" id="advParty"></div>
             </div>
             <div class="card">
               <div class="card-t">The GM's ledger <span class="rule"></span></div>
@@ -1283,10 +1284,12 @@ function renderMoments() {
 }
 $("#lightbox").onclick = () => $("#lightbox").classList.remove("on");
 document.addEventListener("keydown", e => { if (e.key === "Escape") $("#lightbox").classList.remove("on"); });
-$("#momentAdd").onclick = () => {
+const openMomentPicker = () => {
   if (!ADV.id) { toast("Pick an adventure first — moments belong to a story", true); return; }
   $("#momentFile").click();
 };
+$("#momentAdd").onclick = openMomentPicker;
+$("#momentAddTop").onclick = openMomentPicker;
 $("#momentFile").onchange = async () => {
   const f = $("#momentFile").files[0]; $("#momentFile").value = "";
   if (!f || !ADV.id) return;
