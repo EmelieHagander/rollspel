@@ -110,7 +110,20 @@ whole log.
 
 | Verb | Behavior |
 |---|---|
-| `rpg.log_event(adventure_slug, note, kind = 'event')` | Appends one note to today's ledger for the adventure. `kind` is one of `event` \| `ruling` \| `secret_revealed` \| `thread` \| `npc`. Returns the logged entry only (jsonb). Common case: `select rpg.log_event('<slug>', '<note>');` |
+| `rpg.log_event(adventure_slug, note, kind = 'event')` | Appends one note to today's ledger for the adventure. `kind` is one of `event` \| `ruling` \| `secret_revealed` \| `thread` \| `npc` \| `summary`. Returns the logged entry only (jsonb). Common case: `select rpg.log_event('<slug>', '<note>');` |
+
+`kind = 'summary'` is the closing ritual's comprehensive catch-up entry (one
+per close, per the GM prompt). **Resume = latest summary plus entries after
+it** — the session-start read when a story continues:
+
+```sql
+select kind, note from rpg.session_log
+where adventure_slug = '<slug>'
+  and at >= coalesce((select max(at) from rpg.session_log
+                      where adventure_slug = '<slug>' and kind = 'summary'),
+                     'epoch'::timestamptz)
+order by at;
+```
 
 Read the ledger back through the `rpg.session_log` view — **once at session
 close** (drain it into the recap) or **after an interruption** (recover the
