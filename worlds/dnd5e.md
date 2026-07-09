@@ -86,3 +86,30 @@ This world is Ireland, around 3200 BCE, the building of Newgrange — and that f
 2. **Let the clues accumulate** — they are already planted above, in ascending order of aha: a green isle at the world's western edge · **no snakes, pointedly** · the five parts with their gifts · a giant's causeway of hexagonal stones in the north · bog-offerings and bog-bodies · bards, satire, hospitality law, cattle-raids, wakes · geasa · the Neighbors under the hills · a passage tomb aimed at the midwinter sunrise on a river of the white cow · and for the deepest cut, the name *Iweriú* itself — the reconstructed oldest name of Ireland.
 3. **When a player's eyes go wide** — when someone says *"wait… is this Ireland??"* — the answer is never yes and never no. The answer is an NPC's puzzled look ("what is an *ireland*?") and the GM's smile. The world never breaks character; the players get to be *right* without being *told*.
 4. The Drowned Country is the sunken land toward Britain and Doggerland beyond — same treatment: real geography wearing myth, never named.
+
+# Image style
+
+The standard style block. Every session-image prompt **starts from this
+paragraph verbatim**, then adds the scene. One register, every image, so the
+whole campaign looks like one world remembered by one painter.
+
+> Painterly digital illustration in a muted, atmospheric style — textured
+> brushwork, not photorealism, not anime. A neolithic world: turf-and-timber
+> roundhouses, standing stones, hide boats, tools of stone, bone, and rare
+> bronze; clothing of wool, leather, and furs with woven patterns. Landscape
+> of intense wet greens, black bogs, grey stone, and low mist; light is
+> firelight, overcast silver, or low golden sun — never bright blue skies.
+> Mood: warm human firelight against a vast, damp, indifferent wilderness;
+> wonder with an undertow of unease. No medieval elements: no castles, no
+> knights, no plate armor, no heraldry. No text, no borders, no watermarks.
+
+Guards, for whoever composes the prompt:
+
+- **The disguise holds in images too.** Never name the real-world place or
+  era in a prompt; no shamrocks, harps-as-symbols, or anything that labels
+  the Isle. The landscape may resemble what it resembles — that is the
+  players' aha to have, not the image generator's to caption.
+- **Witnessed-only** (per the GM prompt): the scene described must be one the
+  players played. The style block never overrides that fence.
+- Characters appear as they were at the table: their gear, their wounds,
+  their weather. The world has no polished heroes.
