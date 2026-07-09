@@ -59,12 +59,13 @@ sessions/
 
 prompts/                       ← flat; the system tag lives in the filename
 ├── gm-dnd5e.md                ← the GM prompt — read by path, mid-session
+├── standing-instructions-dnd5e.md ← install-once Custom GPT identity (no blanks, no key)
 ├── first-evening-dnd5e.md     ← paste-in for a new table's FIRST evening
 ├── every-evening-dnd5e.md     ← paste-in address card for every later evening
 └── character-creation-dnd5e.md ← paste-in character workshop, any day, no evening
 
 docs/                          ← about the repo itself; never system-namespaced
-└── how-to-run-an-evening.md   ← the owner's guide to the paste-in cards (webapp renders it)
+└── how-to-run-an-evening.md   ← the owner's guide to both run-paths (webapp renders it)
 ```
 
 Why not per-system top-level trees (`dnd5e/rules/…`)? Two reasons, both the
@@ -123,25 +124,44 @@ the second one-shot.
 ## Prompts
 
 Prompts live flat in `prompts/`, tag in filename. A system's full set is
-**four documents**, split by who reads them and when:
+**five documents**, split by who reads them and when:
 
 | Path | Reader, and when |
 |---|---|
 | `prompts/gm-<tag>.md` | The table-side GPT, by path, every session — the GM prompt itself: who to be and how to run the game. Both evening cards point their reader at it. |
+| `prompts/standing-instructions-<tag>.md` | The owner installs it **once** — pasted into a Custom GPT's Instructions field, where it becomes the GPT's permanent identity — after which the table-side GPT carries it every session with no re-paste. Kin to `gm-<tag>.md` (a permanent identity the GPT *is*), not to the cards (per-occasion templates). The vault credentials live in the GPT's Actions configuration, never in the doc, so it holds **no key and no blanks** — and is therefore committed in full like `gm-<tag>.md`, untouched by the never-commit-the-filled-copy rule that guards the cards' key. |
 | `prompts/first-evening-<tag>.md` | The owner, once per new table — copied, blanks filled, pasted into a fresh GPT for the **first** evening: the story kickoff, nothing more. The characters are already forged — that is the workshop card's work, done before game night — so this card connects binder and vault, verifies the table is ready (roster check against the vault; a forged-but-unattached character is attached; a character missing from the vault is **not** built tonight — the owner is sent to the workshop card and play proceeds with who is present), then opens the adventure as the GM prompt directs. |
 | `prompts/every-evening-<tag>.md` | The owner, every **later** evening — the address card: where the binder and vault are, how to get in, what tonight's adventure and table are. |
 | `prompts/character-creation-<tag>.md` | The owner and a player, **any time — no evening required**. Pasted into a fresh GPT, it is a standalone character-creation helper — **not a GM**, bound to no session: it builds characters at the player's pace (however many questions that takes), answers the system's rules questions along the way, saves finished characters to the vault, and files their binder dossiers. Self-contained; it never points at the GM prompt. |
 
-Three of the four are the owner's paste-in templates and answer one
+Two of the five are permanent GM identities the table-side GPT *is*, not
+cards the owner pastes per evening: `gm-<tag>.md`, which the GPT reads by
+path mid-session, and `standing-instructions-<tag>.md`, which the owner
+installs **once** into a Custom GPT and the GPT then carries unpasted. The
+other three are the owner's per-occasion paste-in templates and answer one
 question — *which do I paste?* — by name alone: a table's first evening,
 `first-evening-`; any later evening, `every-evening-`; no evening at all,
 just a character to build, `character-creation-`. Each is self-contained
 (a first evening does not also need the address card; a Tuesday-lunch
-character workshop needs no evening card at all). For D&D 5e:
+character workshop needs no evening card at all).
 
-- `prompts/gm-dnd5e.md`, `prompts/first-evening-dnd5e.md`,
-  `prompts/every-evening-dnd5e.md`, `prompts/character-creation-dnd5e.md` — now
-- the `vtm` and `trudvang` quartets — when those systems arrive
+**Two paths to the table, one GM.** `standing-instructions-<tag>.md` exists
+because the owner's GM can run as a **Custom GPT**: the vault credentials
+live in the GPT's Actions configuration (never in any prompt), so the
+standing instructions carry no blanks and no key. Install them once and every
+later evening opens with a single spoken sentence in a fresh chat — no card,
+no fill-in, no key. This is the **install-once path**. The three
+evening/character cards are the **paste-per-evening path** — the fallback for
+a plain ChatGPT or Claude chat with no Actions and no git access, where the
+owner fills each card's blanks (the key among them) and pastes it fresh each
+time. The two paths are **siblings, not replacements**: both run through the
+same `gm-<tag>.md`, and both build heroes through the same
+`character-creation-<tag>.md`. For D&D 5e:
+
+- `prompts/gm-dnd5e.md`, `prompts/standing-instructions-dnd5e.md`,
+  `prompts/first-evening-dnd5e.md`, `prompts/every-evening-dnd5e.md`,
+  `prompts/character-creation-dnd5e.md` — now
+- the `vtm` and `trudvang` sets — when those systems arrive
 
 *(History: `every-evening-dnd5e.md` was born `prompts/first-contact.md` and was
 `git mv`'d when the true first-evening document arrived and took the "first"
@@ -171,6 +191,14 @@ alone, that system graduates to `prompts/<tag>/`, this map updates first,
 and every citation moves in the same commit. A runtime protocol is a
 chapter, never a variant or a seat; it triggers nothing.
 
+**The standing-instructions doc is a fifth seat, not a variant — ruled
+2026-07-09.** It is a distinct reader-and-occasion (the Custom GPT's
+permanent identity, installed once) with its own unmistakable name, so —
+like the character workshop before it — it *extends* the flat set rather
+than triggering `prompts/<tag>/`. The quartet is a quintet; the flat shelf
+still answers *which do I paste?* by name across the three cards, and *what
+do I install once?* has exactly one answer. The honest limit is unchanged.
+
 **The close-down snippet is not a fifth card — ruled 2026-07-09.** The
 closing ritual lives inside `prompts/gm-dnd5e.md` and the GM runs it
 unprompted; the owner's "we're stopping tonight" nudge is one or two
@@ -184,11 +212,13 @@ owner needs it — its spot is reserved there for **Douglas** to author
 grows blanks or a key, it has become a template and graduates to
 `prompts/close-evening-<tag>.md`, this map updating first.
 
-**The owner's guide to the cards** is `docs/how-to-run-an-evening.md` —
+**The owner's guide to both run-paths** is `docs/how-to-run-an-evening.md` —
 one page, human-facing (the owner's webapp renders it by that stable
-address), answering *which card do I paste, when?* and carrying the
-close-down snippet above. It points at the cards; the cards never point
-back at it, and the table-side GPT never reads it.
+address), presenting the **install-once** setup first (do it once, then
+every night is one sentence) with the **paste-per-evening** cards as the
+fallback, and answering *which card do I paste, when?* along with the
+close-down snippet above. It points at the standing-instructions doc and the
+cards; they never point back at it, and the table-side GPT never reads it.
 
 ## The reference library the GM prompt cites
 
