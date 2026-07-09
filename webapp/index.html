@@ -164,6 +164,8 @@ button { font-family: inherit; cursor: pointer; }
 .card > .card-t .rule { flex: 1; height: 1px; background: linear-gradient(90deg, var(--line), transparent); }
 .mini-btn { border: 1px solid var(--line); background: var(--bg-2); color: var(--ink-dim); border-radius: 8px; padding: 4px 10px; font-family: var(--mono); font-size: .6rem; letter-spacing: .08em; text-transform: uppercase; flex: none; }
 .mini-btn:hover { color: var(--gold); border-color: var(--violet-dim); }
+.beat-more { width: 100%; margin: 8px 0; padding: 9px; border-radius: 10px; border: 1px dashed var(--line); background: var(--bg-2); color: var(--ink-dim); font-family: var(--mono); font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; }
+.beat-more:hover { color: var(--gold); border-color: var(--violet-dim); }
 
 .grid { display: grid; gap: 16px; }
 .sheet { grid-template-columns: 300px 1fr; align-items: start; }
@@ -249,6 +251,18 @@ button { font-family: inherit; cursor: pointer; }
 .spell-detail p { margin: 0; font-size: .85rem; color: var(--ink-dim); max-width: 60ch; }
 .spell-detail .tnote { margin-top: 7px; font-family: var(--serif); font-style: italic; }
 .src { font-family: var(--mono); font-size: .54rem; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); border: 1px solid var(--line); border-radius: 20px; padding: 1px 7px; margin-left: 8px; white-space: nowrap; vertical-align: 1px; }
+
+/* class / subclass expander */
+.class-box { margin-top: 8px; }
+.class-line { display: inline-flex; align-items: center; gap: 8px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 20px; padding: 5px 12px; color: var(--ink-dim); font-family: var(--mono); font-size: .64rem; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; transition: border-color .15s, color .15s; }
+.class-line:hover { color: var(--gold); border-color: var(--violet-dim); }
+.class-line .chev { font-size: .95rem; line-height: 1; transition: transform .18s; }
+.class-box.open .class-line .chev { transform: rotate(90deg); color: var(--gold); }
+.class-detail { display: none; margin-top: 10px; max-width: 68ch; }
+.class-box.open .class-detail { display: block; animation: fade .25s ease; }
+.class-detail .ci-stats { font-family: var(--mono); font-size: .64rem; letter-spacing: .06em; text-transform: uppercase; color: var(--violet); margin-bottom: 6px; }
+.class-detail p { margin: 0 0 8px; font-size: .9rem; color: var(--ink-dim); }
+.class-detail .ci-sub b { color: var(--gold-soft); }
 
 .coins { display: flex; gap: 8px; flex-wrap: wrap; }
 .coin { display: flex; align-items: center; gap: 7px; background: var(--bg-2); border: 1px solid var(--line-soft); border-radius: 20px; padding: 5px 11px 5px 6px; }
@@ -511,6 +525,10 @@ button.tag:hover { border-color: var(--violet-dim); }
         <span class="eyebrow">The vault · rpg.characters</span>
         <h2 id="shName">Vesper Quill</h2>
         <p id="shTag">"I made a bargain with something that laughs in the dark. It's been very generous."</p>
+        <div class="class-box" id="classBox">
+          <button class="class-line" id="classLine" aria-expanded="false"></button>
+          <div class="class-detail" id="classDetail"></div>
+        </div>
       </div>
       <div id="emptyVault" style="display:none">
         <div class="card" style="text-align:center;padding:52px 24px">
@@ -797,6 +815,34 @@ const mod = score => Math.floor((score - 10) / 2);
 const profBonus = lvl => 2 + Math.floor((lvl - 1) / 4);
 const sgn = n => (n >= 0 ? "+" : "") + n;
 
+/* ===================== SRD CLASS POCKET-REFERENCE =====================
+   Class facts (hit die, saves, casting) and paraphrased summaries from 5e
+   SRD 5.1. Subclasses the SRD covers get an "SRD summary"; anything the SRD
+   doesn't include says so plainly rather than inventing features. */
+const CLASSBOOK = {
+  barbarian:{hd:"d12",saves:"Strength, Constitution",text:"A furious warrior who fights in a Rage — resistance to most damage and a bonus to melee hits — and shrugs off blows with Unarmored Defense."},
+  bard:     {hd:"d8", saves:"Dexterity, Charisma", cast:"Charisma",  text:"A magical performer. Bardic Inspiration hands allies a bonus die, casting draws from a flexible known list, and Jack of All Trades sweetens every check."},
+  cleric:   {hd:"d8", saves:"Wisdom, Charisma",     cast:"Wisdom",    text:"A divine caster who prepares from the whole cleric list each day, wields Channel Divinity, and follows a Divine Domain that shapes their miracles."},
+  druid:    {hd:"d8", saves:"Intelligence, Wisdom", cast:"Wisdom",    text:"A priest of the wild who prepares from the full druid list, Wild Shapes into beasts, speaks Druidic, and follows a Circle."},
+  fighter:  {hd:"d10",saves:"Strength, Constitution",text:"A master of weapons and armor: a Fighting Style, Second Wind to recover, Action Surge for an extra burst, and more attacks than anyone as they climb."},
+  monk:     {hd:"d8", saves:"Strength, Dexterity",  text:"A martial artist channeling Ki — flurries of unarmed strikes, Unarmored Defense, and blinding speed."},
+  paladin:  {hd:"d10",saves:"Wisdom, Charisma",     cast:"Charisma",  text:"A holy warrior sworn to an oath. Lay on Hands to heal, Divine Smite to spend spell slots as radiant damage, and auras that shield nearby allies."},
+  ranger:   {hd:"d10",saves:"Strength, Dexterity",  cast:"Wisdom",    text:"A wilderness hunter with a favored foe and terrain, half-caster nature magic, and precise ranged fighting."},
+  rogue:    {hd:"d8", saves:"Dexterity, Intelligence",text:"A skirmisher and specialist: Sneak Attack for burst damage, Expertise on trusted skills, Cunning Action to dash/disengage/hide as a bonus action, and Thieves' Cant."},
+  sorcerer: {hd:"d6", saves:"Constitution, Charisma",cast:"Charisma", text:"An innate caster with Sorcery Points and Metamagic to bend spells — twinning, quickening, and more."},
+  warlock:  {hd:"d8", saves:"Wisdom, Charisma",     cast:"Charisma",  text:"A wielder of magic bargained from an otherworldly patron. Casts through Pact Magic — few slots that recharge on a short rest — shaped by Eldritch Invocations and a Pact Boon."},
+  wizard:   {hd:"d6", saves:"Intelligence, Wisdom", cast:"Intelligence",text:"A scholar of the arcane who learns spells into a book and prepares from it, with Arcane Recovery and a school of specialization."}
+};
+const SUBCLASSBOOK = {
+  "oath of devotion":  {srd:true, text:"The paladin's oath to honesty, courage, compassion, honor and duty. Channel Divinity gives Sacred Weapon (add your Charisma to a weapon's attacks, and it sheds light) and Turn the Unholy; its oath spells lean protective — protection from evil and good, sanctuary — and later an aura keeps you and nearby allies immune to being charmed."},
+  "circle of the land":{srd:true, text:"A druid circle of old lore and ritual: a bonus cantrip, Natural Recovery to regain spell slots on a short rest, and extra 'circle spells' always prepared, chosen by your land (a swamp grants darkness and Melf's acid arrow). Later, Land's Stride ignores natural difficult terrain."},
+  "thief":             {srd:true, text:"A rogue archetype of nimble hands and quick climbs. Fast Hands turns Cunning Action into sleight of hand, using an object, or picking a lock; Second-Story Work makes climbing cheap and lengthens your running jumps."},
+  "champion":          {srd:true, text:"A fighter archetype of raw martial excellence: Improved Critical scores a critical hit on a 19 or 20, and Remarkable Athlete adds half your proficiency to Strength, Dexterity and Constitution checks."},
+  "the fiend":         {srd:true, text:"A warlock patron of the Lower Planes. Dark One's Blessing grants temporary hit points whenever you drop an enemy to 0, and its expanded spells run to fire and command."},
+  "life domain":       {srd:true, text:"A cleric domain of healing and preservation: heavy armor, Disciple of Life so your healing spells restore extra hit points, and a Channel Divinity that heals a burst of nearby creatures."},
+  "school of evocation":{srd:true,text:"A wizard specialty in raw elemental force: Sculpt Spells lets allies dodge your fireballs, and Potent Cantrip presses damage through even on a save."}
+};
+
 /* ===================== DEMO PARTY (fallback when offline / guest) ===================== */
 const MOCK = [
   { id:"vesper", name:"Vesper Quill", player:"Emelie", initial:"V",
@@ -1042,6 +1088,25 @@ $("#rmArt").onclick = async (e) => {
   } catch (err) { toast("Couldn't remove it: " + (err.message || err), true); }
 };
 
+function renderClassInfo(c) {
+  const cb = CLASSBOOK[(c.klass || "").toLowerCase()];
+  const sub = SUBCLASSBOOK[(c.subclass || "").toLowerCase()];
+  $("#classLine").innerHTML =
+    `<span>ⓘ ${esc(c.klass || "—")}${c.subclass ? ` · ${esc(c.subclass)}` : ""}</span><span class="chev">›</span>`;
+  let html = cb
+    ? `<div class="ci-stats">Hit die ${cb.hd} · Saves ${cb.saves}${cb.cast ? ` · Casts with ${cb.cast}` : ""}</div><p>${cb.text} <span class="src">SRD summary</span></p>`
+    : `<p>No class summary in the app's SRD pocket-reference — the binder or the GM holds the details. <span class="src">no rules text</span></p>`;
+  if (c.subclass) {
+    html += sub
+      ? `<p class="ci-sub"><b>${esc(c.subclass)}.</b> ${sub.text} <span class="src">SRD summary</span></p>`
+      : `<p class="ci-sub"><b>${esc(c.subclass)}.</b> This subclass isn't in the 5e SRD — its features live in the binder or with the GM. The class summary above is SRD; ask the GM for the specifics. <span class="src">not in SRD</span></p>`;
+  }
+  $("#classDetail").innerHTML = html;
+}
+$("#classLine").onclick = () => {
+  const box = $("#classBox"), open = box.classList.toggle("open");
+  $("#classLine").setAttribute("aria-expanded", open ? "true" : "false");
+};
 function renderSwitcher() {
   $("#switcher").innerHTML = PARTY.map(p =>
     `<button class="${p.id===current.id?'on':''}" data-id="${p.id}" title="${p.name}">${p.initial}</button>`).join("");
@@ -1063,6 +1128,9 @@ function renderEmptySheet() {
   $("#tbSub").textContent = "no characters yet";
   $("#shName").textContent = "An empty vault";
   $("#shTag").textContent = "Your party will appear here once it exists.";
+  $("#classBox").classList.remove("open");
+  $("#classLine").innerHTML = "";
+  $("#classDetail").innerHTML = "";
 }
 
 function renderSheet() {
@@ -1085,6 +1153,7 @@ function renderSheet() {
   $("#tbSub").innerHTML = `Level ${c.level} ${c.species} ${c.klass}${c.subclass?` · <b>${c.subclass}</b>`:''}`;
   $("#shName").textContent = c.name;
   $("#shTag").textContent = c.quote || `${c.background||c.klass} · ${(c.alignment||'').replace(/_/g,' ')}`;
+  renderClassInfo(c);
 
   $("#hpCur").textContent = c.hpCur; $("#hpMax").textContent = c.hpMax;
   $("#hpBar").style.width = Math.max(0,(c.hpCur/c.hpMax*100)) + "%";
@@ -1338,6 +1407,8 @@ $("#momentFile").onchange = async () => {
 };
 let BEAT_DESC = localStorage.getItem("codex-beat-order") === "desc";
 let LAST_BEATS = [];
+const BEAT_LIMIT = 10;          // phones drown in the full scroll; show the recent window by default
+let beatsExpanded = false;
 function beatSortLabel() {
   $("#beatSort").textContent = BEAT_DESC ? "↓ newest first" : "↑ oldest first";
 }
@@ -1348,23 +1419,35 @@ $("#beatSort").onclick = () => {
   renderBeats(LAST_BEATS);
 };
 beatSortLabel();
+function beatHtml(b) {
+  const who = b.kind === "dialogue" && b.speaker ? `<span class="speaker">${esc(b.speaker)}:</span> ` : "";
+  const meta = [b.kind, (b.kind !== "dialogue" && b.speaker) ? esc(b.speaker) : null].filter(Boolean).join(" · ");
+  const when = b.created_at ? new Date(b.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+  return `<div class="beat ${esc(b.kind)}"><div class="bmeta">${meta}<span style="margin-left:auto">${when}</span></div><p>${who}${esc(b.content)}</p></div>`;
+}
 function renderBeats(rows) {
   LAST_BEATS = rows;
   const host = $("#beats");
-  // chat mode (oldest first) sticks to the bottom; newest-first stays pinned to the top
-  const stick = !BEAT_DESC && (host.scrollHeight - host.scrollTop - host.clientHeight < 80);
+  const atBottom = host.scrollHeight - host.scrollTop - host.clientHeight < 80;
   if (!rows.length) {
     host.innerHTML = `<p style="color:var(--ink-faint);font-size:.85rem">Nothing written yet — the night is young.</p>`;
     return;
   }
-  const view = BEAT_DESC ? [...rows].reverse() : rows;
-  host.innerHTML = view.map(b => {
-    const who = b.kind === "dialogue" && b.speaker ? `<span class="speaker">${esc(b.speaker)}:</span> ` : "";
-    const meta = [b.kind, (b.kind !== "dialogue" && b.speaker) ? esc(b.speaker) : null].filter(Boolean).join(" · ");
-    const when = b.created_at ? new Date(b.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
-    return `<div class="beat ${esc(b.kind)}"><div class="bmeta">${meta}<span style="margin-left:auto">${when}</span></div><p>${who}${esc(b.content)}</p></div>`;
-  }).join("");
-  if (stick) host.scrollTop = host.scrollHeight;   // follow the newest line, like a table listens
+  const total = rows.length;
+  const collapsed = !beatsExpanded && total > BEAT_LIMIT;
+  const shown = collapsed ? rows.slice(total - BEAT_LIMIT) : rows;   // the most recent window, chronological
+  const hidden = total - shown.length;
+  const view = BEAT_DESC ? [...shown].reverse() : shown;
+  const beatsHtml = view.map(beatHtml).join("");
+  const toggle = total > BEAT_LIMIT
+    ? `<button class="beat-more" id="beatMore">${beatsExpanded ? `▲ Collapse to the latest ${BEAT_LIMIT}` : `▼ Show ${hidden} earlier · full history`}</button>`
+    : "";
+  // the hidden (older) beats sit above in oldest-first, below in newest-first — put the control there
+  host.innerHTML = BEAT_DESC ? beatsHtml + toggle : toggle + beatsHtml;
+  const mb = $("#beatMore");
+  if (mb) mb.onclick = () => { beatsExpanded = !beatsExpanded; renderBeats(LAST_BEATS); };
+  // chat mode (oldest first) follows the newest line; newest-first stays pinned to the top
+  if (!BEAT_DESC && atBottom) host.scrollTop = host.scrollHeight;
 }
 function renderAdvParty(links) {
   const host = $("#advParty");
@@ -1421,6 +1504,7 @@ function advStopPoll() {
 $("#advPick").onchange = () => {
   ADV.id = $("#advPick").value || null;
   localStorage.setItem("codex-adventure", ADV.id || "");
+  beatsExpanded = false;          // a fresh adventure opens to its recent window
   renderStory();
   loadAdventureContent().catch(e => toast("Couldn't open the story: " + (e.message || e), true));
   loadBoard().catch(() => {});
